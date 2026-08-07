@@ -369,6 +369,44 @@ export function AddTransactionDrawer({
                             </select>
                             <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6C5B7B]/50 pointer-events-none" />
                           </div>
+                        ) : field.type === 'file' ? (
+                          <div className="w-full">
+                            {formData[field.name] ? (
+                              <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3 text-[15px] font-semibold text-[#355C7D]">
+                                <span className="truncate flex-1 pr-4">
+                                  {formData[field.name] instanceof File 
+                                    ? (formData[field.name] as File).name 
+                                    : formData[field.name].fileName || 'Attached Receipt'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData({ ...formData, [field.name]: null })}
+                                  className="text-red-400 hover:text-red-500 text-xs font-bold"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="flex items-center justify-center w-full bg-gray-50 border border-gray-100 border-dashed rounded-[16px] px-4 py-4 text-[14px] font-bold text-[#6C5B7B]/60 cursor-pointer hover:bg-gray-100 transition-colors">
+                                <span>Upload File</span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept=".jpg,.jpeg,.png,.pdf"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      if (file.size > 10 * 1024 * 1024) {
+                                        alert("File size must be less than 10MB");
+                                        return;
+                                      }
+                                      setFormData({ ...formData, [field.name]: file });
+                                    }
+                                  }}
+                                />
+                              </label>
+                            )}
+                          </div>
                         ) : field.type === 'number' ? (
                            <input
                             type="number"

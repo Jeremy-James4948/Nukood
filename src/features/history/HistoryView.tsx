@@ -19,6 +19,7 @@ import { FinancialCycleService, FinancialCycle } from '../../services/financialC
 import { CategoryService, Category } from '../../services/category.service';
 import { useCurrencyFormatter } from '../../utils/currency';
 import { AddTransactionDrawer } from '../transactions/AddTransactionDrawer';
+import { ReceiptViewer } from '../../components/ui/ReceiptViewer';
 
 const neuExtrude = "bg-[#F3F1EA] shadow-[6px_6px_12px_#e3e0d8,-6px_-6px_12px_#ffffff]";
 const neuExtrudeHover = "hover:shadow-[4px_4px_8px_#e3e0d8,-4px_-4px_8px_#ffffff] hover:scale-[0.98] transition-all";
@@ -157,6 +158,7 @@ export function HistoryView() {
   
   const [selectedTxInfo, setSelectedTxInfo] = useState<{tx: Transaction, category?: Category} | null>(null);
   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
+  const [receiptViewerConfig, setReceiptViewerConfig] = useState<{ isOpen: boolean, storagePath: string, fileName: string, fileType: string } | null>(null);
   
   const { formatAmount } = useCurrencyFormatter();
 
@@ -464,10 +466,27 @@ export function HistoryView() {
                         </div>
                       )}
 
-                      <div className={`flex items-center justify-between px-5 py-4 rounded-[16px] ${neuIndent}`}>
-                        <span className="text-[12px] font-bold text-[#8c8577] uppercase tracking-wider">Receipt</span>
-                        <span className="text-[14px] font-bold text-[#6A6356]">{selectedTxInfo.tx.receiptUrl ? 'Attached' : 'None'}</span>
-                      </div>
+                      {/* Receipt Status & Action */}
+                      {selectedTxInfo.tx.categoryData?.receipt?.attached && (
+                        <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-3 ${neuIndent}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[12px] font-bold text-[#8c8577] uppercase tracking-wider">Receipt</span>
+                            <span className="text-[14px] font-bold text-[#6A6356]">Attached</span>
+                          </div>
+                          <button
+                            onClick={() => setReceiptViewerConfig({
+                              isOpen: true,
+                              storagePath: selectedTxInfo.tx.categoryData.receipt.storagePath,
+                              fileName: selectedTxInfo.tx.categoryData.receipt.fileName,
+                              fileType: selectedTxInfo.tx.categoryData.receipt.fileType,
+                            })}
+                            className={`flex items-center justify-center gap-2 py-3 rounded-[12px] text-[14px] font-bold text-[#355C7D] transition-transform active:scale-[0.98] ${neuExtrude}`}
+                          >
+                            <ExternalLink size={16} />
+                            View Receipt
+                          </button>
+                        </div>
+                      )}
                       
                       {selectedTxInfo.tx.fastEntryId && (
                          <div className={`flex items-center justify-between px-5 py-4 rounded-[16px] ${neuIndent}`}>
@@ -619,6 +638,17 @@ export function HistoryView() {
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
+
+      {/* Receipt Viewer */}
+      {receiptViewerConfig && (
+        <ReceiptViewer
+          isOpen={receiptViewerConfig.isOpen}
+          storagePath={receiptViewerConfig.storagePath}
+          fileName={receiptViewerConfig.fileName}
+          fileType={receiptViewerConfig.fileType}
+          onClose={() => setReceiptViewerConfig({ ...receiptViewerConfig, isOpen: false })}
+        />
+      )}
     </div>
   );
 }

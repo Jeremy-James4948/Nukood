@@ -1,5 +1,6 @@
 import { collection, doc, Timestamp, writeBatch, increment, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { ReceiptService } from './receipt.service';
 
 export interface Transaction {
   transactionId: string;
@@ -48,8 +49,19 @@ export class TransactionService {
     const transactionsRef = collection(db, 'users', userId, 'transactions');
     const newTxRef = doc(transactionsRef);
     
+    // Upload any files in categoryData
+    const processedCategoryData = { ...transactionData.categoryData };
+    for (const key of Object.keys(processedCategoryData)) {
+      if (processedCategoryData[key] instanceof File) {
+        const file = processedCategoryData[key] as File;
+        const metadata = await ReceiptService.uploadReceipt(userId, newTxRef.id, key, file);
+        processedCategoryData[key] = metadata;
+      }
+    }
+
     const newTx = {
       ...transactionData,
+      categoryData: processedCategoryData,
       date: Timestamp.fromDate(txDate), // Ensure Firebase Timestamp
       transactionId: newTxRef.id,
       userId,
@@ -203,6 +215,31 @@ export class TransactionService {
 
     if (safeUpdates.date && safeUpdates.date instanceof Date) {
        safeUpdates.date = Timestamp.fromDate(safeUpdates.date);
+    }
+
+    // Process File objects in categoryData for updates
+    if (safeUpdates.categoryData) {
+      const processedCategoryData = { ...safeUpdates.categoryData };
+      const oldCategoryData = oldTransaction.categoryData || {};
+      
+      for (const key of Object.keys(processedCategoryData)) {
+        const value = processedCategoryData[key];
+        
+        if (value instanceof File) {
+          // Upload new file
+          const metadata = await ReceiptService.uploadReceipt(userId, oldTransaction.transactionId, key, value);
+          processedCategoryData[key] = metadata;
+          
+          // Delete old file if it existed
+          if (oldCategoryData[key] && oldCategoryData[key].storagePath) {
+            await ReceiptService.deleteReceipt(oldCategoryData[key].storagePath);
+          }
+        } else if (value === null && oldCategoryData[key] && oldCategoryData[key].storagePath) {
+          // Explicitly removed
+          await ReceiptService.deleteReceipt(oldCategoryData[key].storagePath);
+        }
+      }
+      safeUpdates.categoryData = processedCategoryData;
     }
 
     // Firestore rejects undefined values, so we remove them
