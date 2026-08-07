@@ -1,0 +1,314 @@
+--- src/features/history/HistoryView.tsx
++++ src/features/history/HistoryView.tsx
+@@ -131,6 +131,13 @@
+   );
+ };
+ 
++interface HistoryFilters {
++  type: 'ALL' | 'INCOME' | 'EXPENSE';
++  categoryId: string | null;
++  hasReceipt: boolean | null;
++  isFastEntry: boolean | null;
++}
++
+ export function HistoryView() {
+   const { activeCycle, userId } = useFinancialEngine();
+   const [cycles, setCycles] = useState<FinancialCycle[]>([]);
+@@ -141,6 +148,15 @@
+   const [categories, setCategories] = useState<Category[]>([]);
+   
+   const [searchQuery, setSearchQuery] = useState('');
++  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
++  
++  const [filters, setFilters] = useState<HistoryFilters>({
++    type: 'ALL',
++    categoryId: null,
++    hasReceipt: null,
++    isFastEntry: null
++  });
++  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
++  
+   const [selectedTxInfo, setSelectedTxInfo] = useState<{tx: Transaction, category?: Category} | null>(null);
+   const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
+   
+@@ -188,14 +204,26 @@
+   const filteredHistory = useMemo(() => {
+     const q = searchQuery.toLowerCase();
+     return transactions.filter(tx => {
+-      if (!q) return true;
+-      const cat = categories.find(c => c.categoryId === tx.categoryId);
+-      return (
+-        tx.title.toLowerCase().includes(q) ||
+-        tx.note?.toLowerCase().includes(q) ||
+-        cat?.name.toLowerCase().includes(q)
+-      );
++      // 1. Search Query
++      if (q) {
++        const cat = categories.find(c => c.categoryId === tx.categoryId);
++        const matchesSearch = tx.title.toLowerCase().includes(q) || tx.note?.toLowerCase().includes(q) || cat?.name.toLowerCase().includes(q);
++        if (!matchesSearch) return false;
++      }
++      
++      // 2. Type Filter
++      if (filters.type !== 'ALL' && tx.transactionType !== filters.type) return false;
++      
++      // 3. Category Filter
++      if (filters.categoryId && tx.categoryId !== filters.categoryId) return false;
++      
++      // 4. Receipt Filter
++      if (filters.hasReceipt !== null && !!tx.receiptUrl !== filters.hasReceipt) return false;
++      
++      // 5. Fast Entry Filter
++      if (filters.isFastEntry !== null && !!tx.fastEntryId !== filters.isFastEntry) return false;
++      
++      return true;
+     });
+-  }, [transactions, searchQuery, categories]);
++  }, [transactions, searchQuery, categories, filters]);
+ 
+   const groupedHistory = useMemo(() => {
+@@ -211,7 +239,21 @@
+     }, {} as Record<string, Transaction[]>);
+   }, [filteredHistory]);
+ 
+-  const filters = ['Category', 'Date', 'Amount', 'Receipt', 'Fast Entry'];
++  const getActiveFilterCount = () => {
++    let count = 0;
++    if (filters.type !== 'ALL') count++;
++    if (filters.categoryId) count++;
++    if (filters.hasReceipt !== null) count++;
++    if (filters.isFastEntry !== null) count++;
++    return count;
++  };
++
++  const clearFilters = () => setFilters({
++    type: 'ALL',
++    categoryId: null,
++    hasReceipt: null,
++    isFastEntry: null
++  });
+ 
+   return (
+     <div className="px-6 flex flex-col min-h-full pb-40 pt-4 bg-[#F3F1EA]">
+@@ -232,32 +274,84 @@
+           </select>
+         </div>
+ 
+-        {/* Search Bar */}
+-        <div className="relative mb-5">
+-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+-            <Search size={18} className="text-[#A39C8D]" />
+-          </div>
+-          <input
+-            type="text"
+-            placeholder="Search transactions..."
+-            value={searchQuery}
+-            onChange={(e) => setSearchQuery(e.target.value)}
+-            className={`w-full pl-11 pr-4 py-3.5 rounded-[20px] outline-none text-[15px] font-medium text-[#6A6356] placeholder:text-[#A39C8D] transition-all ${neuIndent}`}
+-          />
++        {/* Controls Row: Search & Filter */}
++        <div className="flex items-center justify-between mb-5 relative z-20">
++          {/* Expandable Search */}
++          <motion.div 
++            initial={false}
++            animate={{ width: isSearchExpanded ? '100%' : '48px' }}
++            className={`relative h-12 flex items-center overflow-hidden rounded-[24px] ${isSearchExpanded ? neuIndent : neuExtrude}`}
++          >
++            <button 
++              onClick={() => {
++                if (isSearchExpanded && !searchQuery) setIsSearchExpanded(false);
++                else if (!isSearchExpanded) setIsSearchExpanded(true);
++              }}
++              className="absolute left-0 w-12 h-12 flex items-center justify-center text-[#6A6356] z-10"
++            >
++              <Search size={18} />
++            </button>
++            
++            <input
++              type="text"
++              placeholder="Search..."
++              value={searchQuery}
++              onChange={(e) => setSearchQuery(e.target.value)}
++              onBlur={() => {
++                if (!searchQuery) setIsSearchExpanded(false);
++              }}
++              className={`w-full h-full pl-12 pr-10 outline-none text-[15px] font-bold text-[#6A6356] placeholder:text-[#A39C8D] bg-transparent ${isSearchExpanded ? 'opacity-100' : 'opacity-0'}`}
++              style={{ transition: 'opacity 0.2s' }}
++            />
++            
++            <AnimatePresence>
++              {isSearchExpanded && searchQuery && (
++                <motion.button
++                  initial={{ opacity: 0, scale: 0.8 }}
++                  animate={{ opacity: 1, scale: 1 }}
++                  exit={{ opacity: 0, scale: 0.8 }}
++                  onClick={() => setSearchQuery('')}
++                  className="absolute right-3 p-1 rounded-full bg-gray-200/50 text-[#6A6356]"
++                >
++                  <X size={14} />
++                </motion.button>
++              )}
++            </AnimatePresence>
++          </motion.div>
++
++          {/* Filter Button */}
++          <motion.button 
++            animate={{ opacity: isSearchExpanded ? 0 : 1, x: isSearchExpanded ? 20 : 0 }}
++            className={`ml-4 w-12 h-12 rounded-[24px] shrink-0 flex items-center justify-center text-[#6A6356] relative transition-colors ${getActiveFilterCount() > 0 ? neuIndent : neuExtrude}`}
++            onClick={() => setIsFilterDrawerOpen(true)}
++          >
++            <SlidersHorizontal size={18} className={getActiveFilterCount() > 0 ? "text-[#355C7D]" : ""} />
++            {getActiveFilterCount() > 0 && (
++              <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-yellow-500 rounded-full border-2 border-[#F3F1EA]" />
++            )}
++          </motion.button>
+         </div>
+ 
+         {/* Filter Chips */}
+-        <div className="flex overflow-x-auto hide-scrollbar gap-2.5 pb-2 -mx-6 px-6 snap-x">
+-          <button className={`snap-start shrink-0 flex items-center justify-center w-10 h-10 rounded-full text-[#6A6356] ${neuExtrude}`}>
+-            <SlidersHorizontal size={16} />
+-          </button>
+-          {filters.map((filter) => (
+-            <button
+-              key={filter}
+-              className={`snap-start shrink-0 px-4 py-2 rounded-full text-[13px] font-bold text-[#8c8577] flex items-center gap-1.5 ${neuExtrude} active:scale-95 transition-transform`}
+-            >
+-              {filter}
+-              <ChevronDown size={14} className="opacity-50" />
+-            </button>
+-          ))}
+-        </div>
++        <AnimatePresence>
++          {getActiveFilterCount() > 0 && (
++            <motion.div 
++              initial={{ opacity: 0, height: 0 }}
++              animate={{ opacity: 1, height: 'auto' }}
++              exit={{ opacity: 0, height: 0 }}
++              className="flex overflow-x-auto hide-scrollbar gap-2.5 pb-4 -mx-6 px-6 snap-x"
++            >
++              <button onClick={clearFilters} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-red-500 ${neuExtrude}`}>
++                Clear All
++              </button>
++              {filters.type !== 'ALL' && (
++                <button onClick={() => setFilters(f => ({ ...f, type: 'ALL' }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
++                  {filters.type} <X size={12} />
++                </button>
++              )}
++              {filters.categoryId && (
++                <button onClick={() => setFilters(f => ({ ...f, categoryId: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
++                  {categories.find(c => c.categoryId === filters.categoryId)?.name || 'Category'} <X size={12} />
++                </button>
++              )}
++              {filters.hasReceipt !== null && (
++                <button onClick={() => setFilters(f => ({ ...f, hasReceipt: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
++                  {filters.hasReceipt ? 'Has Receipt' : 'No Receipt'} <X size={12} />
++                </button>
++              )}
++              {filters.isFastEntry !== null && (
++                <button onClick={() => setFilters(f => ({ ...f, isFastEntry: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
++                  {filters.isFastEntry ? 'Fast Entry' : 'Manual Entry'} <X size={12} />
++                </button>
++              )}
++            </motion.div>
++          )}
++        </AnimatePresence>
+       </div>
+ 
+       {/* Grouped Transaction Timeline */}
+@@ -395,6 +503,89 @@
+         initialContext={null}
+         editTransaction={selectedTxInfo?.tx || null}
+       />
++
++      {/* Filter Drawer */}
++      <Drawer.Root open={isFilterDrawerOpen} onOpenChange={setIsFilterDrawerOpen}>
++        <Drawer.Portal>
++          <Drawer.Overlay className="fixed inset-0 bg-black/10 backdrop-blur-sm z-[200]" />
++          <Drawer.Content className={`bg-[#F3F1EA] flex flex-col rounded-t-[40px] mt-12 h-[80vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none`}>
++            <div className="pt-6 pb-2 px-8 flex flex-col items-center shrink-0 relative rounded-t-[40px]">
++              <div className={`w-12 h-1.5 rounded-full mb-6 ${neuIndent}`} />
++              <Drawer.Title className="text-2xl font-bold text-[#6A6356] mb-4">Filters</Drawer.Title>
++              <Drawer.Description className="sr-only">Filter transactions</Drawer.Description>
++              <button
++                onClick={() => setIsFilterDrawerOpen(false)}
++                className={`absolute top-6 right-6 p-2 rounded-full text-[#6A6356] ${neuExtrude}`}
++              >
++                <X size={20} />
++              </button>
++            </div>
++
++            <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-4 pb-32" data-vaul-no-drag>
++              <div className="flex flex-col gap-8">
++                
++                {/* Type Filter */}
++                <div>
++                  <span className="text-[12px] font-bold text-[#A39C8D] uppercase tracking-widest mb-4 block pl-2">Type</span>
++                  <div className={`flex items-center p-1.5 rounded-[20px] ${neuExtrude}`}>
++                    {['ALL', 'INCOME', 'EXPENSE'].map((t) => (
++                      <button
++                        key={t}
++                        onClick={() => setFilters({ ...filters, type: t as any })}
++                        className={`flex-1 py-3 text-[13px] font-bold rounded-[16px] transition-all ${filters.type === t ? 'text-[#355C7D] ' + neuIndent : 'text-[#8c8577] hover:text-[#6A6356]'}`}
++                      >
++                        {t}
++                      </button>
++                    ))}
++                  </div>
++                </div>
++
++                {/* Categories Filter */}
++                <div>
++                  <span className="text-[12px] font-bold text-[#A39C8D] uppercase tracking-widest mb-4 block pl-2">Category</span>
++                  <div className="flex flex-wrap gap-3">
++                    <button
++                      onClick={() => setFilters({ ...filters, categoryId: null })}
++                      className={`px-5 py-3 rounded-[20px] text-[13px] font-bold transition-all ${filters.categoryId === null ? 'text-[#355C7D] ' + neuIndent : 'text-[#8c8577] ' + neuExtrude}`}
++                    >
++                      All Categories
++                    </button>
++                    {categories.map(cat => (
++                      <button
++                        key={cat.categoryId}
++                        onClick={() => setFilters({ ...filters, categoryId: cat.categoryId })}
++                        className={`px-5 py-3 rounded-[20px] text-[13px] font-bold transition-all ${filters.categoryId === cat.categoryId ? 'text-[#355C7D] ' + neuIndent : 'text-[#8c8577] ' + neuExtrude}`}
++                      >
++                        {cat.name}
++                      </button>
++                    ))}
++                  </div>
++                </div>
++
++                {/* Attributes Filter */}
++                <div>
++                  <span className="text-[12px] font-bold text-[#A39C8D] uppercase tracking-widest mb-4 block pl-2">Attributes</span>
++                  <div className={`flex flex-col p-3 rounded-[24px] gap-3 ${neuExtrude}`}>
++                    <div className="flex items-center justify-between px-4 py-3">
++                      <span className="text-[14px] font-bold text-[#6A6356]">Has Receipt</span>
++                      <button 
++                        onClick={() => setFilters({ ...filters, hasReceipt: filters.hasReceipt === true ? null : true })}
++                        className={`w-12 h-6 rounded-full relative transition-all ${filters.hasReceipt ? neuIndent + ' bg-[#355C7D]/10' : neuIndent}`}
++                      >
++                        <motion.div animate={{ x: filters.hasReceipt ? 24 : 4 }} className="w-4 h-4 rounded-full bg-[#355C7D] absolute top-1" />
++                      </button>
++                    </div>
++                    <div className="flex items-center justify-between px-4 py-3">
++                      <span className="text-[14px] font-bold text-[#6A6356]">Fast Entry</span>
++                      <button 
++                        onClick={() => setFilters({ ...filters, isFastEntry: filters.isFastEntry === true ? null : true })}
++                        className={`w-12 h-6 rounded-full relative transition-all ${filters.isFastEntry ? neuIndent + ' bg-yellow-500/10' : neuIndent}`}
++                      >
++                        <motion.div animate={{ x: filters.isFastEntry ? 24 : 4 }} className="w-4 h-4 rounded-full bg-yellow-500 absolute top-1" />
++                      </button>
++                    </div>
++                  </div>
++                </div>
++
++              </div>
++            </div>
++          </Drawer.Content>
++        </Drawer.Portal>
++      </Drawer.Root>
+     </div>
+   );
+ }
