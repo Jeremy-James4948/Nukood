@@ -1,23 +1,17 @@
-import { collection, doc, getDocs, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, writeBatch, Timestamp, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { TRANSACTION_TEMPLATES, TransactionTemplate } from '../constants/templates';
+import { GLOBAL_TEMPLATES, TransactionTemplate } from '../constants/templates';
 
 export class TemplateService {
   /**
-   * Retrieves all templates for the given user.
+   * Retrieves all global templates.
    */
-  static async getTemplates(userId: string): Promise<TransactionTemplate[]> {
-    const templatesRef = collection(db, 'users', userId, 'templates');
+  static async getAllTemplates(): Promise<TransactionTemplate[]> {
+    const templatesRef = collection(db, 'templates');
     const snap = await getDocs(templatesRef);
 
     if (snap.empty) {
-      // If no templates exist, initialize the defaults
-      try {
-        return await this.seedDefaultTemplates(userId);
-      } catch (err) {
-        console.error("Failed to seed default templates:", err);
-        return [];
-      }
+      return [];
     }
 
     return snap.docs.map(doc => {
@@ -31,45 +25,49 @@ export class TemplateService {
   }
 
   /**
-   * Seeds the database with the application's default templates for a new user.
+   * Retrieves all active global templates.
    */
-  private static async seedDefaultTemplates(userId: string): Promise<TransactionTemplate[]> {
-    const templatesRef = collection(db, 'users', userId, 'templates');
-    const batch = writeBatch(db);
-    const createdTemplates: TransactionTemplate[] = [];
-    const now = Timestamp.now();
+  static async getActiveTemplates(): Promise<TransactionTemplate[]> {
+    const templatesRef = collection(db, 'templates');
+    const q = query(templatesRef, where('isActive', '==', true));
+    const snap = await getDocs(q);
 
-    const defaultTemplates = Object.values(TRANSACTION_TEMPLATES);
-
-    for (const tpl of defaultTemplates) {
-      const docRef = doc(templatesRef, tpl.templateId);
-      const newTemplate = {
-        ...tpl,
-        createdAt: now,
-        updatedAt: now
-      };
-      batch.set(docRef, newTemplate);
-      createdTemplates.push({
-        ...newTemplate,
-        createdAt: newTemplate.createdAt.toDate(),
-        updatedAt: newTemplate.updatedAt.toDate()
-      });
-    }
-
-    await batch.commit();
-    return createdTemplates;
+    return snap.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+        updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+      } as TransactionTemplate;
+    });
   }
 
   /**
-   * Forces an update of all templates in the database to match the current
-   * hardcoded TRANSACTION_TEMPLATES configurations. Useful for schema migrations.
+   * Retrieves a specific template by its ID.
    */
-  static async syncDefaultTemplates(userId: string): Promise<void> {
-    const templatesRef = collection(db, 'users', userId, 'templates');
+  static async getTemplateById(templateId: string): Promise<TransactionTemplate | null> {
+    const templates = await this.getAllTemplates();
+    return templates.find(t => t.templateId === templateId) || null;
+  }
+
+  /**
+   * Retrieves the template associated with a specific category ID.
+   */
+  static async getTemplateForCategory(categoryId: string): Promise<TransactionTemplate | null> {
+    const templates = await this.getActiveTemplates();
+    return templates.find(t => t.categoryId === categoryId) || null;
+  }
+
+  /**
+   * Internal script to initialize or sync the global templates.
+   * This is NOT user-specific. It seeds the global 'templates' collection.
+   */
+  static async syncGlobalTemplates(): Promise<void> {
+    const templatesRef = collection(db, 'templates');
     const batch = writeBatch(db);
     const now = Timestamp.now();
 
-    const defaultTemplates = Object.values(TRANSACTION_TEMPLATES);
+    const defaultTemplates = Object.values(GLOBAL_TEMPLATES);
 
     for (const tpl of defaultTemplates) {
       const docRef = doc(templatesRef, tpl.templateId);
@@ -80,6 +78,6 @@ export class TemplateService {
     }
 
     await batch.commit();
-    console.log(`Successfully synced templates for user: ${userId}`);
+    console.log(`Successfully synced global templates.`);
   }
 }

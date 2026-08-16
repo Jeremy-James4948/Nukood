@@ -113,7 +113,7 @@ export class FinancialCycleService {
     const docRef = doc(db, 'users', userId, 'financialCycles', cycleId);
 
     // Initialize categorySummary with all default categories
-    const allCategories = await CategoryService.getCategories(userId);
+    const allCategories = await CategoryService.getAllCategories();
     const categorySummary: Record<string, any> = {};
     allCategories.forEach(cat => {
       categorySummary[cat.categoryId] = {

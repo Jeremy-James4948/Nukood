@@ -14,8 +14,10 @@ import {
   Database,
   Palette,
   Edit2,
-  ChevronRight
+  ChevronRight,
+  LogOut
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { FinancialSettingsService } from '../../services/financialSettings.service';
 import { EditModal } from '../../components/ui/EditModal';
@@ -30,6 +32,7 @@ interface SettingsDrawerProps {
 
 export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const { settings, userId, refreshSettings } = useFinancialEngine();
+  const { signOut, user } = useAuth();
   const [editingConfig, setEditingConfig] = useState<{ key: string, title: string, type: 'text'|'number'|'toggle'|'date'|'select', value: any, description?: string, options?: { label: string; value: any; description?: string }[] } | null>(null);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isManageFastEntriesOpen, setIsManageFastEntriesOpen] = useState(false);
@@ -205,6 +208,19 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
       items: [
         { icon: List, label: 'Manage Categories', onClick: () => setIsManageCategoriesOpen(true) },
         { icon: Zap, label: 'Manage Fast Entries', onClick: () => setIsManageFastEntriesOpen(true) }
+      ]
+    },
+    {
+      title: 'Account',
+      items: [
+        { 
+          icon: LogOut, 
+          label: 'Log Out', 
+          value: user?.username || '',
+          onClick: async () => {
+            await signOut();
+          } 
+        }
       ]
     }
   ];

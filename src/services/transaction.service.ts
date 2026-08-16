@@ -8,6 +8,7 @@ export interface Transaction {
   cycleId: string;
   journalId: string;
   categoryId: string;
+  templateId: string;
   transactionType: 'EXPENSE' | 'INCOME';
   title: string;
   amount: number;
@@ -16,7 +17,7 @@ export interface Transaction {
   receiptUrl?: string;
   fastEntryId?: string;
   source?: string;
-  categoryData: Record<string, any>;
+  transactionDetails: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,7 +30,8 @@ export class TransactionService {
     userId: string, 
     cycleId: string, 
     transactionData: Omit<Transaction, 'transactionId' | 'userId' | 'cycleId' | 'journalId' | 'createdAt' | 'updatedAt'>,
-    saveAsFastEntry: boolean
+    saveAsFastEntry: boolean,
+    receiptFile?: File | null
   ): Promise<void> {
     const batch = writeBatch(db);
     const now = Timestamp.now();
@@ -49,19 +51,20 @@ export class TransactionService {
     const transactionsRef = collection(db, 'users', userId, 'transactions');
     const newTxRef = doc(transactionsRef);
     
-    // Upload any files in categoryData
-    const processedCategoryData = { ...transactionData.categoryData };
-    for (const key of Object.keys(processedCategoryData)) {
-      if (processedCategoryData[key] instanceof File) {
-        const file = processedCategoryData[key] as File;
-        const metadata = await ReceiptService.uploadReceipt(userId, newTxRef.id, key, file);
-        processedCategoryData[key] = metadata;
-      }
+    const processedCategoryData = { ...transactionData.transactionDetails };
+    // Dynamic FILE uploading has been removed. Universal global_receipt is used instead.
+
+    // Global Receipt File
+    let finalReceiptUrl = transactionData.receiptUrl;
+    if (receiptFile) {
+      const metadata = await ReceiptService.uploadReceipt(userId, newTxRef.id, 'global_receipt', receiptFile);
+      finalReceiptUrl = metadata.url;
     }
 
     const newTx = {
       ...transactionData,
-      categoryData: processedCategoryData,
+      receiptUrl: finalReceiptUrl,
+      transactionDetails: processedCategoryData,
       date: Timestamp.fromDate(txDate), // Ensure Firebase Timestamp
       transactionId: newTxRef.id,
       userId,
@@ -70,6 +73,13 @@ export class TransactionService {
       createdAt: now,
       updatedAt: now
     };
+
+    // Firestore rejects undefined values, so we remove them
+    Object.keys(newTx).forEach(key => {
+      if ((newTx as any)[key] === undefined) {
+        delete (newTx as any)[key];
+      }
+    });
     
     batch.set(newTxRef, newTx);
 
@@ -108,11 +118,19 @@ export class TransactionService {
     const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
     
     if (transactionData.transactionType === 'EXPENSE') {
-      batch.update(cycleRef, {
+      const cycleUpdates: any = {
         totalSpent: increment(transactionData.amount),
         transactionCount: increment(1),
         updatedAt: now
-      });
+      };
+      
+      if (transactionData.categoryId) {
+        cycleUpdates[`categorySummary.${transactionData.categoryId}.totalSpent`] = increment(transactionData.amount);
+        cycleUpdates[`categorySummary.${transactionData.categoryId}.transactionCount`] = increment(1);
+        cycleUpdates[`categorySummary.${transactionData.categoryId}.lastTransactionAt`] = now;
+      }
+      
+      batch.update(cycleRef, cycleUpdates);
     } else {
       // INCOME updates the available balance (starting balance for the cycle)
       batch.update(cycleRef, {
@@ -175,11 +193,18 @@ export class TransactionService {
     const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
     
     if (transaction.transactionType === 'EXPENSE') {
-      batch.update(cycleRef, {
+      const cycleUpdates: any = {
         totalSpent: increment(-transaction.amount),
         transactionCount: increment(-1),
         updatedAt: now
-      });
+      };
+      
+      if (transaction.categoryId) {
+        cycleUpdates[`categorySummary.${transaction.categoryId}.totalSpent`] = increment(-transaction.amount);
+        cycleUpdates[`categorySummary.${transaction.categoryId}.transactionCount`] = increment(-1);
+      }
+
+      batch.update(cycleRef, cycleUpdates);
     } else {
       batch.update(cycleRef, {
         'budgetSnapshot.availableBalance': increment(-transaction.amount),
@@ -199,7 +224,8 @@ export class TransactionService {
     userId: string,
     cycleId: string,
     oldTransaction: Transaction,
-    updates: Partial<Transaction>
+    updates: Partial<Transaction>,
+    receiptFile?: File | null
   ): Promise<void> {
     const batch = writeBatch(db);
     const now = Timestamp.now();
@@ -217,29 +243,17 @@ export class TransactionService {
        safeUpdates.date = Timestamp.fromDate(safeUpdates.date);
     }
 
-    // Process File objects in categoryData for updates
-    if (safeUpdates.categoryData) {
-      const processedCategoryData = { ...safeUpdates.categoryData };
-      const oldCategoryData = oldTransaction.categoryData || {};
-      
-      for (const key of Object.keys(processedCategoryData)) {
-        const value = processedCategoryData[key];
-        
-        if (value instanceof File) {
-          // Upload new file
-          const metadata = await ReceiptService.uploadReceipt(userId, oldTransaction.transactionId, key, value);
-          processedCategoryData[key] = metadata;
-          
-          // Delete old file if it existed
-          if (oldCategoryData[key] && oldCategoryData[key].storagePath) {
-            await ReceiptService.deleteReceipt(oldCategoryData[key].storagePath);
-          }
-        } else if (value === null && oldCategoryData[key] && oldCategoryData[key].storagePath) {
-          // Explicitly removed
-          await ReceiptService.deleteReceipt(oldCategoryData[key].storagePath);
-        }
-      }
-      safeUpdates.categoryData = processedCategoryData;
+    if (receiptFile) {
+      const metadata = await ReceiptService.uploadReceipt(userId, oldTransaction.transactionId, 'global_receipt', receiptFile);
+      safeUpdates.receiptUrl = metadata.url;
+      // Note: we could delete the old global receipt here if we wanted to be perfectly clean, 
+      // but standard firebase storage doesn't strictly require it if we overwrite the same path.
+    }
+
+    // Dynamic FILE uploading has been removed. Universal global_receipt is used instead.
+    let finalCategoryData = oldTransaction.transactionDetails;
+    if (safeUpdates.transactionDetails) {
+      finalCategoryData = { ...safeUpdates.transactionDetails };
     }
 
     // Firestore rejects undefined values, so we remove them
@@ -266,19 +280,22 @@ export class TransactionService {
 
       const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
       
+      const cycleUpdates: any = {
+        totalSpent: increment(amountDiff),
+        updatedAt: now
+      };
+      
       if (categoryChanged) {
-        // Rollback old category completely
-        batch.update(cycleRef, {
-          totalSpent: increment(amountDiff), // global cycle spent changes by difference
-          updatedAt: now
-        });
+        cycleUpdates[`categorySummary.${oldCategory}.totalSpent`] = increment(-oldAmount);
+        cycleUpdates[`categorySummary.${oldCategory}.transactionCount`] = increment(-1);
+        cycleUpdates[`categorySummary.${newCategory}.totalSpent`] = increment(newAmount);
+        cycleUpdates[`categorySummary.${newCategory}.transactionCount`] = increment(1);
+        cycleUpdates[`categorySummary.${newCategory}.lastTransactionAt`] = now;
       } else if (amountDiff !== 0) {
-        // Same category, just amount changed
-        batch.update(cycleRef, {
-          totalSpent: increment(amountDiff),
-          updatedAt: now
-        });
+        cycleUpdates[`categorySummary.${oldCategory}.totalSpent`] = increment(amountDiff);
       }
+      
+      batch.update(cycleRef, cycleUpdates);
 
       // Adjust Journal if amount or category changed (assuming same journalId)
       if ((amountDiff !== 0 || categoryChanged) && oldTransaction.journalId) {
@@ -345,6 +362,43 @@ export class TransactionService {
 
     // Sort in memory (descending by date)
     return transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
+  /**
+   * Fetches transactions specifically for the selected journals.
+   * Handles Firestore's 'in' query limit of 10 items by batching.
+   */
+  static async getTransactionsForJournals(userId: string, journalIds: string[]): Promise<Transaction[]> {
+    if (!journalIds || journalIds.length === 0) return [];
+    
+    const transactionsRef = collection(db, 'users', userId, 'transactions');
+    const allTransactions: Transaction[] = [];
+    
+    // Firestore 'in' queries are limited to 10 items
+    const chunkSize = 10;
+    for (let i = 0; i < journalIds.length; i += chunkSize) {
+      const chunk = journalIds.slice(i, i + chunkSize);
+      const q = query(
+        transactionsRef,
+        where('journalId', 'in', chunk)
+      );
+      
+      const snap = await getDocs(q);
+      const chunkTxs = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          date: data.date?.toDate(),
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+        } as Transaction;
+      });
+      
+      allTransactions.push(...chunkTxs);
+    }
+    
+    // Sort in memory (descending by date)
+    return allTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
   /**

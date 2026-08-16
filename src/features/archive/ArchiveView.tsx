@@ -18,11 +18,49 @@ import { useCurrencyFormatter } from '../../utils/currency';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { FinancialCycleService, FinancialCycle } from '../../services/financialCycle.service';
 import { DailyJournalService, DailyJournal } from '../../services/dailyJournal.service';
+import { TransactionService, Transaction } from '../../services/transaction.service';
 import { createMockArchive } from './mockArchive';
 
 const IconMap: Record<string, any> = {
   ShoppingBag, Coffee, Film, Train
 };
+
+function AnimatedCounter({ value, symbol }: { value: number, symbol: string }) {
+  const [displayValue, setDisplayValue] = useState(0);
+  
+  useEffect(() => {
+    let startTimestamp: number | null = null;
+    const duration = 1000; // 1 second
+    
+    const step = (timestamp: number) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      
+      // Easing function (easeOutQuart)
+      const ease = 1 - Math.pow(1 - progress, 4);
+      
+      setDisplayValue(value * ease);
+      
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    };
+    
+    window.requestAnimationFrame(step);
+  }, [value]);
+  
+  const formatted = displayValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const [intPart, decimalPart] = formatted.split('.');
+  
+  return (
+    <div className="flex flex-wrap justify-center items-baseline px-2">
+      <span className="text-4xl md:text-5xl font-bold text-[#F67280] tracking-tighter mb-2 tabular-nums break-all">
+        {symbol}{intPart}
+        <span className="text-2xl md:text-3xl text-[#F67280]/60">.{decimalPart}</span>
+      </span>
+    </div>
+  );
+}
 
 export function ArchiveView() {
   const { formatAmount, formatNumber, currencySymbol } = useCurrencyFormatter();
@@ -31,10 +69,13 @@ export function ArchiveView() {
   const [completedCycles, setCompletedCycles] = useState<FinancialCycle[]>([]);
   const [currentCycleIndex, setCurrentCycleIndex] = useState(0);
   const [dailyJournals, setDailyJournals] = useState<DailyJournal[]>([]);
+  const [cycleTransactions, setCycleTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [isDetailedOpen, setIsDetailedOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isFetchingTxs, setIsFetchingTxs] = useState(false);
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
@@ -63,6 +104,7 @@ export function ArchiveView() {
       try {
         const journals = await DailyJournalService.getDailyJournalsForCycle(userId, cycle.cycleId);
         setDailyJournals(journals);
+        setCycleTransactions([]); // clear previous cycle's transactions
         setSelectedDates([]); // clear selection
       } catch (err) {
         console.error("Error loading daily journals:", err);
@@ -141,11 +183,28 @@ export function ArchiveView() {
   const cycleTotalExpenses = cycle.totalSpent;
   const cycleRemaining = cycleBudget - cycleTotalExpenses;
 
+  // Selected Transactions (only used for detailed breakdown now)
+  const selectedTransactions = cycleTransactions; // We already filtered from backend!
+
+  // Aggregate dynamically from selected journals (Backend Math)
+  const aggregatedSummary: Record<string, { totalSpent: number, count: number }> = {};
+  selectedDaysData.forEach(journal => {
+    if (journal.categorySummary) {
+      Object.keys(journal.categorySummary).forEach(catId => {
+        if (!aggregatedSummary[catId]) {
+          aggregatedSummary[catId] = { totalSpent: 0, count: 0 };
+        }
+        aggregatedSummary[catId].totalSpent += journal.categorySummary![catId].totalSpent;
+        aggregatedSummary[catId].count += journal.categorySummary![catId].transactionCount;
+      });
+    }
+  });
+
   // Categories map for drawer
-  const drawerCategories = Object.keys(cycle.categorySummary || {})
-    .filter(catId => cycle.categorySummary![catId].totalSpent > 0)
+  const drawerCategories = Object.keys(aggregatedSummary)
+    .filter(catId => aggregatedSummary[catId].totalSpent > 0)
     .map(catId => {
-      const summary = cycle.categorySummary![catId];
+      const summary = aggregatedSummary[catId];
       const globalCat = globalCategories.find(c => c.categoryId === catId);
       
       const color = globalCat ? globalCat.color : '#8D99AE';
@@ -153,10 +212,11 @@ export function ArchiveView() {
       const iconStr = globalCat ? globalCat.icon : 'ShoppingBag';
       
       return {
+        categoryId: catId,
         name,
         color,
         amount: summary.totalSpent,
-        percent: cycleTotalExpenses > 0 ? (summary.totalSpent / cycleTotalExpenses) * 100 : 0,
+        percent: totalCombinedSpending > 0 ? (summary.totalSpent / totalCombinedSpending) * 100 : 0,
         icon: IconMap[iconStr] || ShoppingBag
       };
     })
@@ -338,9 +398,29 @@ export function ArchiveView() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-24 left-6 right-6 z-40"
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-md z-40"
           >
-            <Drawer.Root>
+            <Drawer.Root
+              open={isDrawerOpen}
+              onOpenChange={async (open) => {
+                setIsDrawerOpen(open);
+                if (open) {
+                  // Fetch transactions specifically for selected journals
+                  setIsFetchingTxs(true);
+                  try {
+                    const journalIds = selectedDaysData.map(j => j.journalId);
+                    const txs = await TransactionService.getTransactionsForJournals(userId, journalIds);
+                    setCycleTransactions(txs);
+                  } catch (err) {
+                    console.error("Error fetching selected transactions:", err);
+                  } finally {
+                    setIsFetchingTxs(false);
+                  }
+                } else {
+                  setIsDetailedOpen(false);
+                }
+              }}
+            >
               <Drawer.Trigger asChild>
                 <button
                   className="w-full bg-[#355C7D] text-white py-4 px-6 rounded-2xl font-bold flex items-center justify-between shadow-[0_8px_32px_-8px_rgba(53,92,125,0.5)] hover:bg-[#2A4A65] active:scale-[0.98] transition-all"
@@ -359,52 +439,48 @@ export function ArchiveView() {
 
               <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-[#355C7D]/20 backdrop-blur-sm z-50" />
-                <Drawer.Content className="bg-gray-50 flex flex-col rounded-t-[32px] h-[85vh] mt-24 fixed bottom-0 left-0 right-0 z-50">
-                  <div className="p-4 bg-white rounded-t-[32px] flex-shrink-0 border-b border-gray-100">
+                <Drawer.Content className="bg-gray-50 flex flex-col rounded-t-[32px] max-h-[85vh] h-auto mt-24 fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+                  <div className="p-4 bg-white rounded-t-[32px] flex-shrink-0 border-b border-gray-100 relative">
                     <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-200 mb-6" />
                     <div className="flex items-center justify-between px-2">
-                      <Drawer.Title className="text-xl font-bold text-[#355C7D]">Expense Summary</Drawer.Title>
+                      <div className="w-8" /> {/* Placeholder for balance */}
+                      <Drawer.Title className="text-xl font-bold text-[#355C7D] absolute left-1/2 -translate-x-1/2">Expense Summary</Drawer.Title>
                       <Drawer.Close asChild>
-                        <button className="p-2 bg-gray-100 rounded-full text-[#6C5B7B]">
+                        <button className="p-2 bg-gray-50 hover:bg-gray-100 rounded-full text-[#6C5B7B] transition-colors">
                           <X size={20} />
                         </button>
                       </Drawer.Close>
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto hide-scrollbar pb-10">
-                    <div className="px-6 pt-2 pb-6 bg-white border-b border-gray-100 flex flex-wrap gap-2">
+                  <div className="overflow-y-auto hide-scrollbar pb-10">
+                    <div className="px-6 pt-2 pb-5 bg-white border-b border-gray-100 flex flex-wrap gap-2 justify-center">
                       {selectedDates.map(dateStr => {
                         const d = new Date(`${dateStr}T12:00:00Z`);
                         return (
-                          <div key={dateStr} className="px-3 py-1 bg-[#F9FAFB] border border-gray-200 rounded-lg text-[13px] font-medium text-[#6C5B7B]">
+                          <div key={dateStr} className="px-3.5 py-1.5 bg-[#F9FAFB] border border-gray-200 rounded-full text-[13px] font-semibold text-[#6C5B7B] shadow-sm">
                             {formatJournalDate(d).date} {formatJournalDate(d).month}
                           </div>
                         );
                       })}
                     </div>
 
-                    <div className="px-6 py-10 flex flex-col items-center justify-center text-center bg-white rounded-b-[32px] shadow-[0_12px_32px_-12px_rgba(108,91,123,0.08)] relative overflow-hidden">
+                    <div className="px-6 py-8 flex flex-col items-center justify-center text-center bg-white rounded-b-[32px] shadow-[0_12px_32px_-12px_rgba(108,91,123,0.08)] relative overflow-hidden">
                       <div className="absolute top-0 right-0 w-64 h-64 bg-[#F8B195]/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
-                      <span className="text-sm font-semibold text-[#6C5B7B] uppercase tracking-wider mb-3">Total Spent</span>
-                      <span className="text-6xl font-bold text-[#F67280] tracking-tight mb-2">
-                        {currencySymbol}{formatNumber(totalCombinedSpending).split('.')[0]}
-                        {formatNumber(totalCombinedSpending).includes('.') && (
-                          <span className="text-3xl text-[#F67280]/60">.{formatNumber(totalCombinedSpending).split('.')[1]}</span>
-                        )}
-                      </span>
+                      <span className="text-xs font-bold text-[#6C5B7B]/70 uppercase tracking-[0.2em] mb-2">Total Spent</span>
+                      <AnimatedCounter value={totalCombinedSpending} symbol={currencySymbol} />
                     </div>
 
-                    <div className="px-6 py-8">
+                    <div className="px-6 py-4">
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex flex-col">
-                          <span className="text-xs font-medium text-[#6C5B7B] mb-1">Transactions</span>
+                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                          <span className="text-[10px] font-bold text-[#6C5B7B]/70 uppercase tracking-widest mb-1">Transactions</span>
                           <span className="text-xl font-bold text-[#355C7D]">
                             {selectedDaysData.reduce((acc, j) => acc + j.transactionCount, 0)}
                           </span>
                         </div>
-                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex flex-col">
-                          <span className="text-xs font-medium text-[#6C5B7B] mb-1">Days Included</span>
+                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                          <span className="text-[10px] font-bold text-[#6C5B7B]/70 uppercase tracking-widest mb-1">Days</span>
                           <span className="text-xl font-bold text-[#355C7D]">{selectedDates.length}</span>
                         </div>
                       </div>
@@ -440,6 +516,79 @@ export function ArchiveView() {
                           </div>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Detailed Breakdown */}
+                    <div className="px-6 pb-12 mt-4">
+                      <button 
+                        onClick={() => setIsDetailedOpen(!isDetailedOpen)}
+                        className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-gray-100 active:scale-[0.99] transition-transform"
+                      >
+                        <span className="font-bold text-[#355C7D]">Detailed Breakdown</span>
+                        <ChevronDown 
+                          size={20} 
+                          className={`text-[#6C5B7B] transition-transform duration-300 ${isDetailedOpen ? 'rotate-180' : ''}`} 
+                        />
+                      </button>
+
+                      <AnimatePresence>
+                        {isDetailedOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden mt-4"
+                          >
+                            {isFetchingTxs ? (
+                              <div className="flex justify-center items-center py-8">
+                                <span className="text-[#6C5B7B] font-medium text-sm">Loading transactions...</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-6">
+                                {drawerCategories.map((cat) => {
+                                  const catTxs = selectedTransactions.filter(t => t.categoryId === cat.categoryId && t.transactionType === 'EXPENSE');
+                                  if (catTxs.length === 0) return null;
+
+                                return (
+                                  <div key={cat.categoryId} className="flex flex-col">
+                                    <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+                                      <div className="flex items-center gap-2">
+                                        <cat.icon size={16} style={{ color: cat.color }} />
+                                        <span className="font-bold text-sm text-[#355C7D]">{cat.name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-xs text-[#6C5B7B]">{catTxs.length} txs</span>
+                                        <span className="font-bold text-sm" style={{ color: cat.color }}>{formatAmount(cat.amount)}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col gap-3 pl-2 border-l-2" style={{ borderColor: `${cat.color}30` }}>
+                                      {catTxs.map(tx => (
+                                        <div key={tx.transactionId} className="flex justify-between items-start pl-2 gap-2">
+                                          <div className="flex flex-col min-w-0 flex-1">
+                                            <span className="text-sm font-semibold text-[#355C7D] leading-tight truncate">{tx.title}</span>
+                                            <span className="text-[11px] text-[#6C5B7B] mt-0.5">
+                                              {tx.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                              {tx.transactionDetails && tx.transactionDetails.quantity && (
+                                                <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[9px] uppercase tracking-wider">
+                                                  Qty: {tx.transactionDetails.quantity}
+                                                </span>
+                                              )}
+                                            </span>
+                                          </div>
+                                          <span className="font-bold text-sm text-[#F67280] whitespace-nowrap flex-shrink-0">
+                                            {formatAmount(tx.amount)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
                 </Drawer.Content>

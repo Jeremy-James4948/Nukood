@@ -5,7 +5,31 @@ This document outlines the core backend architecture and infrastructure decision
 ## 1. Firebase Configuration & Setup
 - **Environment**: Secrets and keys are configured safely via Vite environment variables (`.env.local`).
 - **Initialization**: Centralized Firebase app, Firestore, and Auth initialization inside `src/lib/firebase.ts`.
-- **Active Services**: Firestore (Database) and Firebase Authentication.
+- **Active Services**: Firestore (Database) and Firebase Authentication (pending).
+
+### 1.1 Development Authentication System
+
+During the current development phase, a **temporary development authentication system** is implemented. 
+We are NOT using Firebase Authentication yet.
+
+#### Architecture
+The authentication logic is abstracted to allow a seamless swap to Firebase later without affecting the UI or protected routes:
+`Login Page -> Auth Context -> Auth Service -> Auth Provider Interface -> Development Auth Provider`
+
+- **Auth Service & Interface**: `src/services/auth/authService.ts` and `src/types/auth.ts` define standard methods (`signIn`, `signOut`, `getCurrentUser`, `subscribeToAuthState`).
+- **Provider**: `DevelopmentAuthProvider` currently implements this interface.
+- **Session Persistence**: Sessions are saved to `localStorage` under `nukood_dev_auth_session` to persist across reloads. *No passwords are stored in localStorage.*
+
+#### Development Users
+The following hardcoded users are strictly for development. **These credentials are not stored in Firestore** and must not be used as production authentication:
+
+| Username | Password  | User ID (AuthUser) |
+| -------- | --------- | ------------------ |
+| JJ       | jj123     | dev_jj             |
+| jeremy   | jeremy123 | dev_jeremy         |
+
+#### Future Firebase Compatibility
+Because the rest of the application (UI, transactions, cycles) depends solely on the generic `AuthUser` interface and `AuthContext`, replacing the `DevelopmentAuthProvider` with a `FirebaseAuthProvider` in the future will require zero changes to the underlying business logic or component hierarchy.
 
 ---
 

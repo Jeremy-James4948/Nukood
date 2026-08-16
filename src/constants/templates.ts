@@ -1,109 +1,131 @@
 export interface TemplateField {
-  name: string;
-  type: 'text' | 'number' | 'dropdown' | 'file';
+  fieldId: string;
+  type: 'TEXT' | 'NUMBER' | 'DROPDOWN';
   label: string;
   options?: string[];
   suggestions?: string[];
   required: boolean;
-  setsTitle?: boolean;
+  setsTitle?: boolean; // If true, the selected/entered value populates the transaction title
 }
 
 export interface TransactionTemplate {
   templateId: string;
+  categoryId: string;
   name: string;
+  version: number;
   fields: TemplateField[];
+  isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 /**
- * Transaction Templates define the dynamic schema for what fields 
- * should be rendered and collected for each category.
+ * GLOBAL TRANSACTION TEMPLATES
+ * These define the dynamic schema for category-specific fields collected.
+ * Note: Global fields (title, amount, date, note, receipt, fast entry) are handled by the core Transaction model.
  */
-export const TRANSACTION_TEMPLATES: Record<string, Omit<TransactionTemplate, 'createdAt' | 'updatedAt'>> = {
-  groceries_template: {
-    templateId: 'groceries_template',
+export const GLOBAL_TEMPLATES: Record<string, Omit<TransactionTemplate, 'createdAt' | 'updatedAt'>> = {
+  tpl_groceries: {
+    templateId: 'tpl_groceries',
+    categoryId: 'cat_groceries',
     name: 'Groceries',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'itemName', type: 'text', label: 'Name', required: true, setsTitle: true },
-      { name: 'quantity', type: 'number', label: 'Quantity', required: true },
-      { name: 'weight', type: 'number', label: 'Weight', required: false },
-      { name: 'unit', type: 'dropdown', label: 'Unit', options: ['kg', 'grams', 'Liters', 'ml', 'Packets'], required: true },
-      { name: 'pricePerUnit', type: 'number', label: 'Price per item', required: false },
-      { name: 'storeName', type: 'text', label: 'Store Name', suggestions: ['Zepto', 'Blinkit', 'BigBasket'], required: false },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'storeName', type: 'TEXT', label: 'Store Name', suggestions: ['Zepto', 'Blinkit', 'BigBasket'], required: false },
+      { fieldId: 'quantity', type: 'NUMBER', label: 'Quantity', required: false },
+      { fieldId: 'weight', type: 'NUMBER', label: 'Weight (per item)', required: false },
+      { fieldId: 'unit', type: 'DROPDOWN', label: 'Unit', options: ['kg', 'grams', 'Liters', 'ml', 'Packets'], required: false },
+      { fieldId: 'pricePerUnit', type: 'NUMBER', label: 'Price per Unit', required: false },
+      // totalAmount is calculated dynamically
     ]
   },
-  food_template: {
-    templateId: 'food_template',
+  tpl_food: {
+    templateId: 'tpl_food',
+    categoryId: 'cat_food',
     name: 'Food',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'restaurantName', type: 'text', label: 'Restaurant / App Name', suggestions: ['Swiggy', 'Zomato', 'Starbucks', 'VIT', 'Bava’s'], required: true, setsTitle: true },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'restaurantOrAppName', type: 'TEXT', label: 'Restaurant / App Name', suggestions: ['Swiggy', 'Zomato', 'Starbucks', 'VIT', 'Bava’s'], required: true, setsTitle: true },
     ]
   },
-  transport_template: {
-    templateId: 'transport_template',
+  tpl_transport: {
+    templateId: 'tpl_transport',
+    categoryId: 'cat_transport',
     name: 'Transport',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'mode', type: 'dropdown', label: 'Mode of Travel', options: ['Auto', 'Cab', 'Bike', 'Metro', 'Bus', 'Train', 'Flight'], required: true },
-      { name: 'startLocation', type: 'text', label: 'Start Location', required: false },
-      { name: 'destination', type: 'text', label: 'Destination', required: false },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'modeOfTravel', type: 'DROPDOWN', label: 'Mode of Travel', options: ['Auto', 'Cab', 'Bike', 'Metro', 'Bus', 'Train', 'Flight'], required: true, setsTitle: true },
+      { fieldId: 'startLocation', type: 'TEXT', label: 'Start Location', required: false },
+      { fieldId: 'destination', type: 'TEXT', label: 'Destination', required: false },
     ]
   },
-  house_template: {
-    templateId: 'house_template',
+  tpl_house: {
+    templateId: 'tpl_house',
+    categoryId: 'cat_house',
     name: 'House',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'expenseType', type: 'dropdown', label: 'Expense Type', options: ['Rent', 'Electricity', 'Wi-Fi', 'Maintenance', 'Water', 'Cleaning/Maid'], required: true, setsTitle: true },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'expenseType', type: 'DROPDOWN', label: 'Expense Type', options: ['Rent', 'Electricity', 'Wi-Fi', 'Maintenance', 'Water', 'Cleaning/Maid'], required: true, setsTitle: true },
     ]
   },
-  personal_template: {
-    templateId: 'personal_template',
+  tpl_personal: {
+    templateId: 'tpl_personal',
+    categoryId: 'cat_personal',
     name: 'Personal',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'subcategory', type: 'dropdown', label: 'Subcategory', options: ['Clothing', 'Grooming/Salon', 'Electronics', 'Personal Care', 'Gifts'], required: true },
-      { name: 'quantity', type: 'number', label: 'Quantity', required: false },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'subcategory', type: 'DROPDOWN', label: 'Subcategory', options: ['Clothing', 'Grooming/Salon', 'Electronics', 'Personal Care', 'Gifts'], required: true, setsTitle: true },
+      { fieldId: 'quantity', type: 'NUMBER', label: 'Quantity', required: false },
     ]
   },
-  entertainment_template: {
-    templateId: 'entertainment_template',
+  tpl_entertainment: {
+    templateId: 'tpl_entertainment',
+    categoryId: 'cat_entertainment',
     name: 'Entertainment',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'activityType', type: 'dropdown', label: 'Activity Type', options: ['Movie', 'Gaming', 'Concert/Event', 'Sports', 'Streaming Subscription'], required: true },
-      { name: 'platformOrVenue', type: 'text', label: 'Platform / Venue', required: false },
-      { name: 'groupOrOccasion', type: 'text', label: 'Group / Occasion', required: false },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'activityType', type: 'DROPDOWN', label: 'Activity Type', options: ['Movie', 'Gaming', 'Concert/Event', 'Sports', 'Streaming Subscription'], required: true, setsTitle: true },
+      { fieldId: 'platformOrVenue', type: 'TEXT', label: 'Platform / Venue', required: false },
+      { fieldId: 'groupOrOccasion', type: 'TEXT', label: 'Group / Occasion', required: false },
     ]
   },
-  medical_template: {
-    templateId: 'medical_template',
+  tpl_medical: {
+    templateId: 'tpl_medical',
+    categoryId: 'cat_medical',
     name: 'Medical',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'expenseType', type: 'dropdown', label: 'Expense Type', options: ['Pharmacy/Medicines', 'Doctor Consultation', 'Lab Test', 'Fitness'], required: true },
-      { name: 'providerName', type: 'text', label: 'Provider / Clinic Name', required: false },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'expenseType', type: 'DROPDOWN', label: 'Expense Type', options: ['Pharmacy/Medicines', 'Doctor Consultation', 'Lab Test', 'Fitness'], required: true, setsTitle: true },
+      { fieldId: 'providerOrClinicName', type: 'TEXT', label: 'Provider / Clinic Name', required: false },
     ]
   },
-  college_template: {
-    templateId: 'college_template',
+  tpl_college: {
+    templateId: 'tpl_college',
+    categoryId: 'cat_college',
     name: 'College',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'purpose', type: 'dropdown', label: 'Purpose', options: ['Printing', 'Stationery', 'Lab/Exam Fee', 'Events', 'Extra Curricular'], required: true, setsTitle: true },
-      { name: 'quantity', type: 'number', label: 'Quantity', required: false },
-      { name: 'pricePerUnit', type: 'number', label: 'Price per unit', required: false },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'purpose', type: 'DROPDOWN', label: 'Purpose', options: ['Printing', 'Stationery', 'Lab/Exam Fee', 'Events', 'Extra Curricular'], required: true, setsTitle: true },
+      { fieldId: 'quantity', type: 'NUMBER', label: 'Quantity', required: false },
+      { fieldId: 'pricePerUnit', type: 'NUMBER', label: 'Price per Unit', required: false },
     ]
   },
-  balance_added_template: {
-    templateId: 'balance_added_template',
+  tpl_balance_added: {
+    templateId: 'tpl_balance_added',
+    categoryId: 'cat_balance_added',
     name: 'Balance Added',
+    version: 1,
+    isActive: true,
     fields: [
-      { name: 'sourceOfFunds', type: 'dropdown', label: 'Source of Funds', options: ['Monthly Allowance', 'Refund', 'Settled Split', 'Side Income/Project', 'Gift'], required: true },
-      { name: 'receipt', type: 'file', label: 'Receipt Attachment', required: false },
+      { fieldId: 'sourceOfFunds', type: 'DROPDOWN', label: 'Source of Funds', options: ['Monthly Allowance', 'Refund', 'Settled Split', 'Side Income/Project', 'Gift'], required: true, setsTitle: true },
     ]
   },
 };

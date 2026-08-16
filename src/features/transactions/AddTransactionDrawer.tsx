@@ -4,6 +4,7 @@ import { Drawer } from 'vaul';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
   Plus,
   Zap
@@ -33,14 +34,18 @@ export function AddTransactionDrawer({
 }: AddTransactionDrawerProps) {
   const [step, setStep] = useState<'SELECT_CATEGORY' | 'FORM'>('SELECT_CATEGORY');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
+  const [title, setTitle] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [note, setNote] = useState<string>('');
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [date, setDate] = useState<string>(
+    new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+  );
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveAsFastEntry, setSaveAsFastEntry] = useState(false);
   
-  const { categories, templates, fastEntries, activeCycle, userId, refreshCycle, refreshTransactions, refreshFastEntries } = useFinancialEngine();
+  const { settings, categories, templates, fastEntries, activeCycle, userId, refreshCycle, refreshTransactions, refreshFastEntries } = useFinancialEngine();
   const { currencySymbol } = useCurrencyFormatter();
 
   useEffect(() => {
@@ -50,15 +55,25 @@ export function AddTransactionDrawer({
         setActiveCategory(foundCat || null);
         setStep('FORM');
         setAmount(editTransaction.amount.toString());
+        setTitle(editTransaction.title || '');
         setNote(editTransaction.note || '');
-        setDate(editTransaction.date ? new Date(editTransaction.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-        setFormData(editTransaction.categoryData || {});
+        setReceiptFile(null);
+        if (editTransaction.date) {
+          const d = new Date(editTransaction.date);
+          setDate(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+        } else {
+          setDate(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+        }
+        setFormData(editTransaction.transactionDetails || {});
         setSaveAsFastEntry(false);
       } else if (initialContext?.category) {
         const foundCat = categories.find(c => c.name === initialContext.category);
         setActiveCategory(foundCat || null);
         setStep('FORM');
-        setAmount(initialContext.price || '');
+        
+        if (initialContext.price) setAmount(initialContext.price.replace(/[^0-9.]/g, ''));
+        if (initialContext.notes) setNote(initialContext.notes);
+        if (initialContext.name) setTitle(initialContext.name);
 
         // Pre-fill the fast entry specific values into the category's form schema
         const mappedData: Record<string, string> = {};
@@ -75,9 +90,11 @@ export function AddTransactionDrawer({
       } else {
         setStep('SELECT_CATEGORY');
         setActiveCategory(null);
+        setTitle('');
         setAmount('');
         setNote('');
-        setDate(new Date().toISOString().split('T')[0]);
+        setReceiptFile(null);
+        setDate(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
         setFormData({});
         setSaveAsFastEntry(false);
       }
@@ -88,7 +105,8 @@ export function AddTransactionDrawer({
     setActiveCategory(cat);
     setAmount('');
     setNote('');
-    setDate(new Date().toISOString().split('T')[0]);
+    setReceiptFile(null);
+    setDate(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
     setFormData({});
     setStep('FORM');
   };
@@ -110,11 +128,12 @@ export function AddTransactionDrawer({
         activeCycle.cycleId,
         {
           categoryId: sourceTx.categoryId,
+          templateId: sourceTx.templateId,
           transactionType: sourceTx.transactionType,
           title: sourceTx.title,
           amount: sourceTx.amount,
           date: new Date(), // New date for today
-          categoryData: sourceTx.categoryData
+          transactionDetails: sourceTx.transactionDetails
         },
         false // Do not save as fast entry again
       );
@@ -145,15 +164,27 @@ export function AddTransactionDrawer({
   };
 
   const handleSave = async () => {
-    if (!activeCategory || !activeCycle || !amount || isNaN(Number(amount))) return;
+    if (!activeCategory || !activeCycle) return;
     
     try {
-      setIsSaving(true);
-      
+      // Validate dynamic required fields based on the active template
+      const template = templates.find(t => t.categoryId === activeCategory.categoryId);
+      if (template) {
+        for (const field of template.fields) {
+          if (field.required) {
+            const val = formData[field.fieldId];
+            if (!val || String(val).trim() === '') {
+              alert(`Please fill out the required field: ${field.label}`);
+              return;
+            }
+          }
+        }
+      }
+
       let finalAmount = Number(amount);
       
       // Auto-calculate for Groceries if quantity and pricePerUnit exist
-      if (activeCategory.templateId === 'groceries_template') {
+      if (activeCategory.categoryId === 'cat_groceries' || activeCategory.categoryId === 'cat_college') {
         const qty = Number(formData['quantity']);
         const price = Number(formData['pricePerUnit']);
         if (!isNaN(qty) && !isNaN(price) && qty > 0 && price > 0) {
@@ -161,23 +192,30 @@ export function AddTransactionDrawer({
         }
       }
 
-      let title = activeCategory.name;
-      const template = templates.find(t => t.templateId === activeCategory.templateId);
-      if (template) {
-        const titleField = template.fields.find(f => f.setsTitle);
-        if (titleField && formData[titleField.name]) {
-          title = formData[titleField.name];
-        } else if (Object.values(formData)[0]) {
-          title = Object.values(formData)[0];
-        }
+      if (isNaN(finalAmount) || finalAmount <= 0) {
+        alert("Please enter a valid amount or fill out quantity and price.");
+        return;
       }
 
-      const isIncome = activeCategory.templateId === 'balance_added_template';
+      setIsSaving(true);
 
-      // Parse the date input correctly (using local timezone)
-      const [year, month, day] = date.split('-').map(Number);
-      const txDate = new Date();
-      txDate.setFullYear(year, month - 1, day);
+      let finalTitle = title.trim();
+      if (!finalTitle && template) {
+        // Fallback to auto-generation if user left title empty
+        const titleField = template.fields.find(f => f.setsTitle);
+        if (titleField && formData[titleField.fieldId]) {
+          finalTitle = formData[titleField.fieldId];
+        } else if (Object.values(formData)[0]) {
+          finalTitle = String(Object.values(formData)[0]);
+        }
+      }
+      // Ultimate fallback to category name
+      if (!finalTitle) finalTitle = activeCategory.name;
+
+      const isIncome = activeCategory.type === 'INCOME';
+
+      // Parse the datetime-local input correctly
+      const txDate = new Date(date);
       
       if (editTransaction) {
         await TransactionService.updateTransaction(
@@ -186,12 +224,14 @@ export function AddTransactionDrawer({
           editTransaction,
           {
             categoryId: activeCategory.categoryId,
-            title,
+            templateId: template?.templateId || 'none',
+            title: finalTitle,
             amount: finalAmount,
             date: txDate,
             note: note.trim() || undefined,
-            categoryData: formData
-          }
+            transactionDetails: formData
+          },
+          receiptFile
         );
       } else {
         await TransactionService.createTransaction(
@@ -199,14 +239,16 @@ export function AddTransactionDrawer({
           activeCycle.cycleId,
           {
             categoryId: activeCategory.categoryId,
+            templateId: template?.templateId || 'none',
             transactionType: isIncome ? 'INCOME' : 'EXPENSE',
-            title,
+            title: finalTitle,
             amount: finalAmount,
             date: txDate,
             note: note.trim() || undefined,
-            categoryData: formData
+            transactionDetails: formData
           },
-          saveAsFastEntry
+          saveAsFastEntry,
+          receiptFile
         );
       }
       
@@ -219,9 +261,10 @@ export function AddTransactionDrawer({
       
       if (onSuccess) onSuccess();
       handleClose();
-    } catch (err) {
-      console.error("Failed to save transaction:", err);
-      // In a real app we'd show a toast here
+    } catch (error: any) {
+      console.error("Failed to save transaction:", error);
+      alert(error.message || "Failed to save transaction.");
+      setIsSaving(false);
     } finally {
       setIsSaving(false);
     }
@@ -296,9 +339,11 @@ export function AddTransactionDrawer({
                   <div>
                     <span className="text-[11px] font-bold text-[#6C5B7B]/50 uppercase tracking-widest mb-4 block pl-2">Browse Categories</span>
                     <div className="bg-white rounded-[32px] p-2 shadow-sm border border-[#355C7D]/5">
-                      {categories.map((cat, idx) => {
+                      {categories
+                        .filter(cat => !(settings?.hiddenCategoryIds || []).includes(cat.categoryId))
+                        .map((cat, idx, arr) => {
                         const Icon = IconMap[cat.icon as keyof typeof IconMap] || IconMap.Circle;
-                        const isLast = idx === categories.length - 1;
+                        const isLast = idx === arr.length - 1;
                         
                         return (
                           <button
@@ -352,14 +397,14 @@ export function AddTransactionDrawer({
 
                   {/* Dynamic Fields based on Template */}
                   <div className="bg-white rounded-[32px] p-6 shadow-sm border border-[#355C7D]/5 flex flex-col gap-5">
-                    {templates.find(t => t.templateId === activeCategory.templateId)?.fields.map(field => (
-                      <div key={field.name} className="flex flex-col gap-2">
+                    {templates.find(t => t.categoryId === activeCategory.categoryId)?.fields.map(field => (
+                      <div key={field.fieldId} className="flex flex-col gap-2">
                         <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">{field.label}</label>
-                        {field.type === 'dropdown' && field.options ? (
+                        {(field.type === 'DROPDOWN' || field.type === 'dropdown') && field.options ? (
                           <div className="relative">
                             <select
-                              value={formData[field.name] || ''}
-                              onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                              value={formData[field.fieldId] || ''}
+                              onChange={(e) => setFormData({ ...formData, [field.fieldId]: e.target.value })}
                               className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none appearance-none focus:border-[#355C7D]/20 transition-colors"
                             >
                               <option value="">Select...</option>
@@ -369,60 +414,38 @@ export function AddTransactionDrawer({
                             </select>
                             <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6C5B7B]/50 pointer-events-none" />
                           </div>
-                        ) : field.type === 'file' ? (
-                          <div className="w-full">
-                            {formData[field.name] ? (
-                              <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3 text-[15px] font-semibold text-[#355C7D]">
-                                <span className="truncate flex-1 pr-4">
-                                  {formData[field.name] instanceof File 
-                                    ? (formData[field.name] as File).name 
-                                    : formData[field.name].fileName || 'Attached Receipt'}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setFormData({ ...formData, [field.name]: null })}
-                                  className="text-red-400 hover:text-red-500 text-xs font-bold"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ) : (
-                              <label className="flex items-center justify-center w-full bg-gray-50 border border-gray-100 border-dashed rounded-[16px] px-4 py-4 text-[14px] font-bold text-[#6C5B7B]/60 cursor-pointer hover:bg-gray-100 transition-colors">
-                                <span>Upload File</span>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept=".jpg,.jpeg,.png,.pdf"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      if (file.size > 10 * 1024 * 1024) {
-                                        alert("File size must be less than 10MB");
-                                        return;
-                                      }
-                                      setFormData({ ...formData, [field.name]: file });
-                                    }
-                                  }}
-                                />
-                              </label>
-                            )}
-                          </div>
-                        ) : field.type === 'number' ? (
+                        ) : (field.type === 'NUMBER' || field.type === 'number') ? (
                            <input
                             type="number"
-                            placeholder={field.placeholder}
-                            value={formData[field.name] || ''}
-                            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                            placeholder={field.label}
+                            value={formData[field.fieldId] || ''}
+                            onChange={(e) => setFormData({ ...formData, [field.fieldId]: e.target.value })}
                             className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
                           />
                         ) : (
-                          <input
-                            type="text"
-                            placeholder={field.placeholder}
-                            value={formData[field.name] || ''}
-                            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
-                          />
+                          <div className="flex flex-col gap-2">
+                            <input
+                              type="text"
+                              placeholder={field.label}
+                              value={formData[field.fieldId] || ''}
+                              onChange={(e) => setFormData({ ...formData, [field.fieldId]: e.target.value })}
+                              className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
+                            />
+                            {field.suggestions && field.suggestions.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {field.suggestions.map(suggestion => (
+                                  <button
+                                    key={suggestion}
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, [field.fieldId]: suggestion })}
+                                    className="px-3 py-1.5 bg-[#F3F1EA] text-[#6C5B7B] text-[12px] font-bold rounded-full hover:bg-gray-200 transition-colors"
+                                  >
+                                    {suggestion}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     ))}
@@ -431,9 +454,19 @@ export function AddTransactionDrawer({
                   {/* Standard Form Fields */}
                   <div className="bg-white rounded-[32px] p-6 shadow-sm border border-[#355C7D]/5 flex flex-col gap-5">
                     <div className="flex flex-col gap-2">
+                      <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">Transaction Title</label>
+                      <input
+                        type="text"
+                        placeholder={activeCategory.name}
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
                       <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">Date</label>
                       <input
-                        type="date"
+                        type="datetime-local"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
                         className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none focus:border-[#355C7D]/20 transition-colors"
@@ -448,6 +481,50 @@ export function AddTransactionDrawer({
                         onChange={(e) => setNote(e.target.value)}
                         className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
                       />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">Receipt Attachment</label>
+                      <div className="w-full">
+                        {receiptFile || editTransaction?.receiptUrl ? (
+                          <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3 text-[15px] font-semibold text-[#355C7D]">
+                            <span className="truncate flex-1 pr-4">
+                              {receiptFile ? receiptFile.name : 'Attached Receipt'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReceiptFile(null);
+                                if (editTransaction && editTransaction.receiptUrl) {
+                                  // Can't delete existing receipts easily here, so we'll just ignore for now or wait for save.
+                                  // But typically clearing the file won't delete the old URL unless we specifically handle it.
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-500 text-xs font-bold"
+                            >
+                              {receiptFile ? 'Remove' : 'View'}
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex items-center justify-center w-full bg-gray-50 border border-gray-100 border-dashed rounded-[16px] px-4 py-4 text-[14px] font-bold text-[#6C5B7B]/60 cursor-pointer hover:bg-gray-100 transition-colors">
+                            <span>Upload File</span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".jpg,.jpeg,.png,.pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    alert("File size must be less than 10MB");
+                                    return;
+                                  }
+                                  setReceiptFile(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -489,9 +566,3 @@ export function AddTransactionDrawer({
   );
 }
 
-// Simple fallback chevron for select fields
-const ChevronDown = ({ size, className }: any) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <polyline points="6 9 12 15 18 9"></polyline>
-  </svg>
-);

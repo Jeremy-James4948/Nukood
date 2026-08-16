@@ -47,8 +47,7 @@ export function SnapshotWidget() {
     };
   })
   .filter(c => c.amount > 0)
-  .sort((a, b) => b.amount - a.amount)
-  .slice(0, 4); // Only show top 4 for the rings currently
+  .sort((a, b) => b.amount - a.amount);
 
   // --- Dynamic Budget Math ---
   const spentThisMonth = activeCycle.totalSpent;

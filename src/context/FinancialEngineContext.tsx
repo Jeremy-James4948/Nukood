@@ -9,6 +9,7 @@ import { Transaction, TransactionService } from '../services/transaction.service
 import { TransactionTemplate } from '../constants/templates';
 import { TemplateService } from '../services/template.service';
 import { DailyJournal, DailyJournalService } from '../services/dailyJournal.service';
+import { useAuth } from './AuthContext';
 
 interface FinancialEngineContextType {
   settings: FinancialSettings | null;
@@ -26,10 +27,9 @@ interface FinancialEngineContextType {
   refreshCategories: () => Promise<void>;
   refreshTransactions: () => Promise<void>;
   refreshFastEntries: () => Promise<void>;
-  updateCategory: (categoryId: string, updates: Partial<Category>) => Promise<void>;
-  deleteCategory: (categoryId: string) => Promise<void>;
   updateFastEntry: (fastEntryId: string, updates: Partial<FastEntry>) => Promise<void>;
   deleteFastEntry: (fastEntryId: string) => Promise<void>;
+  toggleCategoryVisibility: (categoryId: string) => Promise<void>;
 }
 
 const FinancialEngineContext = createContext<FinancialEngineContextType | undefined>(undefined);
@@ -42,10 +42,10 @@ export const useFinancialEngine = () => {
   return context;
 };
 
-// Mock user for now since auth isn't implemented
-const MOCK_USER_ID = "demo-user-1";
-
 export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated } = useAuth();
+  const userId = user?.userId || '';
+
   const [settings, setSettings] = useState<FinancialSettings | null>(null);
   const [activeCycle, setActiveCycle] = useState<FinancialCycle | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -60,12 +60,29 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
     let mounted = true;
 
     const initializeEngine = async () => {
+      if (!isAuthenticated || !userId) {
+        if (mounted) {
+          setSettings(null);
+          setActiveCycle(null);
+          setCategories([]);
+          setTemplates([]);
+          setFastEntries([]);
+          setTransactions([]);
+          setDailyJournals([]);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
       try {
         // 1. Fetch or Initialize Settings
-        let currentSettings = await FinancialSettingsService.getSettings(MOCK_USER_ID);
+        let currentSettings = await FinancialSettingsService.getSettings(userId);
         if (!currentSettings) {
-          // Setup a default budget of 1500 for the demo user
-          currentSettings = await FinancialSettingsService.initializeSettings(MOCK_USER_ID, {
+          // Setup a default budget of 1500 for the new user
+          currentSettings = await FinancialSettingsService.initializeSettings(userId, {
             monthlyBudget: 1500,
             currency: 'INR'
           });
@@ -75,64 +92,52 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
         setSettings(currentSettings);
 
         // 2. Fetch or Initialize Active Cycle
-        let cycle = await FinancialCycleService.getActiveCycle(MOCK_USER_ID);
+        let cycle = await FinancialCycleService.getActiveCycle(userId);
         if (!cycle) {
-          cycle = await FinancialCycleService.createNewCycle(MOCK_USER_ID, currentSettings, "Current Cycle");
+          cycle = await FinancialCycleService.createNewCycle(userId, currentSettings, "Current Cycle");
         }
 
         if (!mounted) return;
         setActiveCycle(cycle);
 
-        // 3. Fetch or Initialize Categories
-        console.log("Fetching categories for user:", MOCK_USER_ID);
-        // MIGRATION: Force sync categories to backend to push the new color scheme
-        await CategoryService.syncDefaultCategories(MOCK_USER_ID);
-        const userCategories = await CategoryService.getCategories(MOCK_USER_ID);
-        console.log("Fetched categories:", userCategories);
+        // 3. Fetch Active Global Categories
+        console.log("Fetching active global categories...");
+        const activeCategories = await CategoryService.getActiveCategories();
         if (!mounted) return;
-        setCategories(userCategories);
+        setCategories(activeCategories);
 
-        // 3b. Fetch or Initialize Templates
-        // MIGRATION: Force sync templates to backend to push the new Grocery changes
-        await TemplateService.syncDefaultTemplates(MOCK_USER_ID);
-        const userTemplates = await TemplateService.getTemplates(MOCK_USER_ID);
+        // 3b. Fetch Active Global Templates
+        const activeTemplates = await TemplateService.getActiveTemplates();
         if (!mounted) return;
-        setTemplates(userTemplates);
+        setTemplates(activeTemplates);
 
         // 4. Fetch Fast Entries
-        const userFastEntries = await FastEntryService.getFastEntries(MOCK_USER_ID);
+        const userFastEntries = await FastEntryService.getFastEntries(userId);
         if (!mounted) return;
         setFastEntries(userFastEntries);
 
-        // 5. Fetch Transactions and Daily Journals if there's an active cycle
-        if (cycle) {
-          // Temporary budget overwrite request from user
-          await FinancialCycleService.setTemporaryBudget(MOCK_USER_ID, cycle.cycleId, 15000);
-          // Refetch cycle to get the updated availableBalance
-          const updatedCycle = await FinancialCycleService.getActiveCycle(MOCK_USER_ID);
-          if (updatedCycle && mounted) setActiveCycle(updatedCycle);
 
-          const userTransactions = await TransactionService.getTransactionsForCycle(MOCK_USER_ID, cycle.cycleId);
+          const userTransactions = await TransactionService.getTransactionsForCycle(userId, cycle.cycleId);
           
           // MIGRATION: Automatically heal older transactions without journalIds
           const missing = userTransactions.filter(tx => !tx.journalId);
           if (missing.length > 0) {
             console.log("Migrating missing journals...", missing.length);
-            await TransactionService.migrateMissingJournals(MOCK_USER_ID, cycle.cycleId, missing);
+            await TransactionService.migrateMissingJournals(userId, cycle.cycleId, missing);
             // Re-fetch transactions after fixing
-            const fixedTransactions = await TransactionService.getTransactionsForCycle(MOCK_USER_ID, cycle.cycleId);
+            const fixedTransactions = await TransactionService.getTransactionsForCycle(userId, cycle.cycleId);
             if (!mounted) return;
             setTransactions(fixedTransactions);
           }
           
           // MIGRATION: Category Summary Initialization
-          const currentCycle = updatedCycle || cycle;
-          const finalTransactions = missing.length > 0 ? (await TransactionService.getTransactionsForCycle(MOCK_USER_ID, cycle.cycleId)) : userTransactions;
+          const currentCycle = cycle;
+          const finalTransactions = missing.length > 0 ? (await TransactionService.getTransactionsForCycle(userId, cycle.cycleId)) : userTransactions;
 
           if (!currentCycle.categorySummary) {
             console.log("Migrating categorySummary...");
             const categorySummary: Record<string, any> = {};
-            userCategories.forEach(cat => {
+            activeCategories.forEach(cat => {
                categorySummary[cat.categoryId] = {
                  totalSpent: 0,
                  transactionCount: 0,
@@ -152,7 +157,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
                }
             });
             
-            const cycleRef = doc(db, 'users', MOCK_USER_ID, 'financialCycles', currentCycle.cycleId);
+            const cycleRef = doc(db, 'users', userId, 'financialCycles', currentCycle.cycleId);
             await updateDoc(cycleRef, { categorySummary });
             
             currentCycle.categorySummary = categorySummary;
@@ -164,7 +169,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
             setTransactions(userTransactions);
           }
           
-          const userJournals = await DailyJournalService.getDailyJournalsForCycle(MOCK_USER_ID, cycle.cycleId);
+          const userJournals = await DailyJournalService.getDailyJournalsForCycle(userId, cycle.cycleId);
           
           // MIGRATION: Journal Category Summary
           let journalsModified = false;
@@ -186,7 +191,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
                 }
               });
 
-              const jRef = doc(db, 'users', MOCK_USER_ID, 'financialCycles', cycle.cycleId, 'dailyJournals', journal.journalId);
+              const jRef = doc(db, 'users', userId, 'financialCycles', cycle.cycleId, 'dailyJournals', journal.journalId);
               await updateDoc(jRef, { categorySummary: jSummary });
               return { ...journal, categorySummary: jSummary };
             }
@@ -195,7 +200,6 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
           if (!mounted) return;
           setDailyJournals(migratedJournals);
-        }
 
       } catch (err) {
         if (mounted) {
@@ -218,7 +222,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const refreshCycle = async () => {
     try {
-      const cycle = await FinancialCycleService.getActiveCycle(MOCK_USER_ID);
+      const cycle = await FinancialCycleService.getActiveCycle(userId);
       if (cycle) {
         setActiveCycle(cycle);
       }
@@ -229,7 +233,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const refreshSettings = async () => {
     try {
-      const currentSettings = await FinancialSettingsService.getSettings(MOCK_USER_ID);
+      const currentSettings = await FinancialSettingsService.getSettings(userId);
       if (currentSettings) {
         setSettings(currentSettings);
       }
@@ -240,20 +244,37 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const refreshCategories = async () => {
     try {
-      const userCategories = await CategoryService.getCategories(MOCK_USER_ID);
-      setCategories(userCategories);
+      const activeCategories = await CategoryService.getActiveCategories();
+      setCategories(activeCategories);
     } catch (err) {
       console.error("Error refreshing categories:", err);
+    }
+  };
+
+  const toggleCategoryVisibility = async (categoryId: string) => {
+    if (!settings) return;
+    const currentHidden = settings.hiddenCategoryIds || [];
+    const isHidden = currentHidden.includes(categoryId);
+    
+    const newHidden = isHidden 
+      ? currentHidden.filter(id => id !== categoryId) 
+      : [...currentHidden, categoryId];
+
+    try {
+      await FinancialSettingsService.updateSettings(userId, { hiddenCategoryIds: newHidden });
+      setSettings({ ...settings, hiddenCategoryIds: newHidden });
+    } catch (err) {
+      console.error("Error toggling category visibility:", err);
     }
   };
 
   const refreshTransactions = async () => {
     try {
       if (activeCycle) {
-        const userTransactions = await TransactionService.getTransactionsForCycle(MOCK_USER_ID, activeCycle.cycleId);
+        const userTransactions = await TransactionService.getTransactionsForCycle(userId, activeCycle.cycleId);
         setTransactions(userTransactions);
         
-        const userJournals = await DailyJournalService.getDailyJournalsForCycle(MOCK_USER_ID, activeCycle.cycleId);
+        const userJournals = await DailyJournalService.getDailyJournalsForCycle(userId, activeCycle.cycleId);
         setDailyJournals(userJournals);
       }
     } catch (err) {
@@ -263,36 +284,18 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const refreshFastEntries = async () => {
     try {
-      const userFastEntries = await FastEntryService.getFastEntries(MOCK_USER_ID);
+      const userFastEntries = await FastEntryService.getFastEntries(userId);
       setFastEntries(userFastEntries);
     } catch (err) {
       console.error("Error refreshing fast entries:", err);
     }
   };
 
-  const updateCategory = async (categoryId: string, updates: Partial<Category>) => {
-    try {
-      await CategoryService.updateCategory(MOCK_USER_ID, categoryId, updates);
-      await refreshCategories();
-    } catch (err) {
-      console.error("Error updating category:", err);
-      throw err;
-    }
-  };
 
-  const deleteCategory = async (categoryId: string) => {
-    try {
-      await CategoryService.deleteCategory(MOCK_USER_ID, categoryId);
-      await refreshCategories();
-    } catch (err) {
-      console.error("Error deleting category:", err);
-      throw err;
-    }
-  };
 
   const updateFastEntry = async (fastEntryId: string, updates: Partial<FastEntry>) => {
     try {
-      await FastEntryService.updateFastEntry(MOCK_USER_ID, fastEntryId, updates);
+      await FastEntryService.updateFastEntry(userId, fastEntryId, updates);
       await refreshFastEntries();
     } catch (err) {
       console.error("Error updating fast entry:", err);
@@ -302,7 +305,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const deleteFastEntry = async (fastEntryId: string) => {
     try {
-      await FastEntryService.deleteFastEntry(MOCK_USER_ID, fastEntryId);
+      await FastEntryService.deleteFastEntry(userId, fastEntryId);
       await refreshFastEntries();
     } catch (err) {
       console.error("Error deleting fast entry:", err);
@@ -312,9 +315,14 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   return (
     <FinancialEngineContext.Provider value={{ 
-      settings, activeCycle, categories, templates, fastEntries, transactions, dailyJournals, isLoading, error, userId: MOCK_USER_ID, 
-      refreshCycle, refreshSettings, refreshCategories, refreshTransactions, refreshFastEntries, updateCategory, deleteCategory, updateFastEntry, deleteFastEntry 
-    }}>
+      settings, activeCycle, categories, templates, fastEntries, transactions, dailyJournals, isLoading, error, userId: userId, 
+      refreshCycle, refreshSettings, refreshCategories, refreshTransactions,
+        refreshFastEntries,
+        updateFastEntry,
+        deleteFastEntry,
+        toggleCategoryVisibility
+      }}
+    >
       {children}
     </FinancialEngineContext.Provider>
   );

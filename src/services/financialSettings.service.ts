@@ -13,6 +13,7 @@ export interface FinancialSettings {
     cycleLengthDays: number;
     autoCreateNextCycle: boolean;
   };
+  hiddenCategoryIds?: string[];
 }
 
 const DEFAULT_SETTINGS: FinancialSettings = {
@@ -24,7 +25,8 @@ const DEFAULT_SETTINGS: FinancialSettings = {
     startDate: new Date(),
     cycleLengthDays: 31,
     autoCreateNextCycle: true,
-  }
+  },
+  hiddenCategoryIds: []
 };
 
 export class FinancialSettingsService {

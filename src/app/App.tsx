@@ -6,9 +6,14 @@ import { ArchiveView } from '../features/archive/ArchiveView';
 import { DailyCardCarousel } from '../features/dashboard/DailyCardCarousel';
 import { SnapshotWidget } from '../features/snapshot/SnapshotWidget';
 import { FinancialEngineProvider } from '../context/FinancialEngineContext';
+import { TemplateService } from '../services/template.service';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Journal');
+
+  React.useEffect(() => {
+    TemplateService.syncGlobalTemplates().catch(console.error);
+  }, []);
 
   return (
     <FinancialEngineProvider>

@@ -166,7 +166,7 @@ export function HistoryView() {
   useEffect(() => {
     if (!userId) return;
     
-    CategoryService.getCategories(userId).then(setCategories);
+    CategoryService.getAllCategories().then(setCategories);
     FinancialCycleService.getAllCycles(userId).then((fetched) => {
       setCycles(fetched);
       if (activeCycle) {
@@ -467,7 +467,7 @@ export function HistoryView() {
                       )}
 
                       {/* Receipt Status & Action */}
-                      {selectedTxInfo.tx.categoryData?.receipt?.attached && (
+                      {selectedTxInfo.tx.transactionDetails?.receipt?.attached && (
                         <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-3 ${neuIndent}`}>
                           <div className="flex items-center justify-between">
                             <span className="text-[12px] font-bold text-[#8c8577] uppercase tracking-wider">Receipt</span>
@@ -476,9 +476,9 @@ export function HistoryView() {
                           <button
                             onClick={() => setReceiptViewerConfig({
                               isOpen: true,
-                              storagePath: selectedTxInfo.tx.categoryData.receipt.storagePath,
-                              fileName: selectedTxInfo.tx.categoryData.receipt.fileName,
-                              fileType: selectedTxInfo.tx.categoryData.receipt.fileType,
+                              storagePath: selectedTxInfo.tx.transactionDetails.receipt.storagePath,
+                              fileName: selectedTxInfo.tx.transactionDetails.receipt.fileName,
+                              fileType: selectedTxInfo.tx.transactionDetails.receipt.fileType,
                             })}
                             className={`flex items-center justify-center gap-2 py-3 rounded-[12px] text-[14px] font-bold text-[#355C7D] transition-transform active:scale-[0.98] ${neuExtrude}`}
                           >
