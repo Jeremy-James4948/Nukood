@@ -86,29 +86,20 @@ Onboarding **does exist** from Phase 5 work.
 - **Duplicate Cycles**: Prevented by the atomic batch write using a deterministic date-based `cycleId`.
 
 ## 11. Recommended Future Boundary
-To properly isolate the new visual identity of the Entry Experience from the heavily themed main application, the architecture should be structured as follows in `main.tsx`:
+To properly isolate the new visual identity of the Entry Experience from the heavily themed main application, the architecture should be structured to push the Application Theme down the tree so it only applies where the application exists. 
 
 ```text
-LOGIN / ENTRY SYSTEM (Isolated Theme)
-  ↓
-AUTHENTICATED USER
-  ↓
-INITIALIZATION CHECK
-  ↓
-┌─────────────────────────────────────────┐
-│ isOnboarded === false                   │
-│ ↓                                       │
-│ Entry Experience Router                 │
-│ (Custom layout, isolated design tokens) │
-│ ↓                                       │
-│ Onboarding Flow                         │
-└─────────────────────────────────────────┘
-          OR
-┌─────────────────────────────────────────┐
-│ isOnboarded === true                    │
-│ ↓                                       │
-│ Main Application Router                 │
-│ (ThemeProvider, FinancialEngine, etc.)  │
-└─────────────────────────────────────────┘
+App Root (main.tsx)
+ │
+ ├── Entry Experience Router
+ │     ├── Login (Isolated Theme)
+ │     └── Onboarding (Isolated Theme)
+ │
+ └── Application Experience Router
+       │
+       └── ThemeProvider
+             ├── Normal
+             ├── Light
+             └── Dark
 ```
-This ensures that the complex Application Theme does not bleed into the pristine Entry Experience.
+This ensures that the complex Application Theme does not bleed into the pristine Entry Experience, as the Entry routes will sit entirely outside the `<ThemeProvider>`.
