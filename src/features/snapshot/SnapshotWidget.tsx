@@ -77,6 +77,7 @@ export function SnapshotWidget() {
 
   const budgetStats = {
     availableBalance,
+    remainingBalance,
     spentThisMonth,
     dailyBudget,
     avgSpending,
@@ -93,7 +94,7 @@ export function SnapshotWidget() {
       
       {/* Top Section: Balance */}
       <div className="flex flex-col items-center relative mb-4">
-        <span className="text-[13px] font-bold text-[#9B968B] uppercase tracking-[0.2em] mb-4">Available Balance</span>
+        <span className="text-[13px] font-bold text-[#9B968B] uppercase tracking-[0.2em] mb-4">Remaining Balance</span>
         <div className="flex items-start text-[#6A6356]">
           <span className="text-[36px] font-semibold mt-1 mr-2 text-[#9B968B]">{currencySymbol}</span>
           <span className="text-[84px] font-bold tracking-tighter leading-none">

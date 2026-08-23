@@ -52,7 +52,7 @@ export function BudgetHealthDrawer({ isOpen, onClose, stats }: { isOpen: boolean
               </div>
               <div className="bg-white p-5 rounded-[24px] shadow-sm border border-gray-50 flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-[#6C5B7B]/70 uppercase tracking-widest">Remaining Bal</span>
-                <span className="text-xl font-bold text-[#355C7D]">{formatAmount(stats.availableBalance)}</span>
+                <span className="text-xl font-bold text-[#355C7D]">{formatAmount(stats.remainingBalance)}</span>
               </div>
               <div className="bg-white p-5 rounded-[24px] shadow-sm border border-gray-50 flex flex-col gap-1">
                 <span className="text-[10px] font-bold text-[#6C5B7B]/70 uppercase tracking-widest">Remaining Days</span>

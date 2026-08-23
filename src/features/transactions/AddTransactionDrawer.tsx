@@ -97,6 +97,7 @@ export function AddTransactionDrawer({
         setDate(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
         setFormData({});
         setSaveAsFastEntry(false);
+        setIsSaving(false);
       }
     }
   }, [isOpen, initialContext, editTransaction, categories]);
@@ -148,6 +149,7 @@ export function AddTransactionDrawer({
       handleClose();
     } catch (err) {
       console.error("Failed to load fast entry:", err);
+    } finally {
       setIsSaving(false);
     }
   };
@@ -160,6 +162,7 @@ export function AddTransactionDrawer({
       setFormData({});
       setAmount('');
       setSaveAsFastEntry(false);
+      setIsSaving(false);
     }, 300);
   };
 
