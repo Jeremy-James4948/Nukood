@@ -54,9 +54,9 @@ function AnimatedCounter({ value, symbol }: { value: number, symbol: string }) {
   
   return (
     <div className="flex flex-wrap justify-center items-baseline px-2">
-      <span className="text-4xl md:text-5xl font-bold text-[#F67280] tracking-tighter mb-2 tabular-nums break-all">
+      <span className="text-4xl md:text-5xl font-bold text-accent-warm tracking-tighter mb-2 tabular-nums break-all">
         {symbol}{intPart}
-        <span className="text-2xl md:text-3xl text-[#F67280]/60">.{decimalPart}</span>
+        <span className="text-2xl md:text-3xl text-accent-warm/60">.{decimalPart}</span>
       </span>
     </div>
   );
@@ -120,11 +120,11 @@ export function ArchiveView() {
   if (completedCycles.length === 0) {
     return (
       <div className="px-6 flex flex-col items-center justify-center min-h-[70vh] pb-10 pt-20 text-center">
-        <div className="w-24 h-24 bg-[#355C7D]/5 rounded-full flex items-center justify-center mb-6">
-          <Check size={40} className="text-[#355C7D]/30" />
+        <div className="w-24 h-24 bg-primary/5 rounded-full flex items-center justify-center mb-6">
+          <Check size={40} className="text-foreground/30" />
         </div>
-        <h2 className="text-2xl font-bold text-[#355C7D] mb-2">No Archived Cycles</h2>
-        <p className="text-[#6C5B7B] mb-8 max-w-[250px]">
+        <h2 className="text-2xl font-bold text-foreground mb-2">No Archived Cycles</h2>
+        <p className="text-muted-foreground mb-8 max-w-[250px]">
           When your current budget cycle ends, all your daily journals will be beautifully archived here.
         </p>
         <button 
@@ -135,7 +135,7 @@ export function ArchiveView() {
              setCompletedCycles(cycles);
              setIsLoading(false);
           }}
-          className="px-6 py-3 bg-[#355C7D] text-white rounded-2xl font-bold shadow-sm hover:opacity-90 active:scale-95 transition-all text-sm">
+          className="px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-neu-extrude hover:opacity-90 active:scale-95 transition-all text-sm">
           Generate Mock Cycle (Debug)
         </button>
       </div>
@@ -230,7 +230,7 @@ export function ArchiveView() {
           <button 
             onClick={() => setCurrentCycleIndex(Math.min(currentCycleIndex + 1, completedCycles.length - 1))}
             disabled={currentCycleIndex === completedCycles.length - 1}
-            className={`w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 text-[#6C5B7B] transition-all ${currentCycleIndex === completedCycles.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}>
+            className={`w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-neu-extrude border border-border text-muted-foreground transition-all ${currentCycleIndex === completedCycles.length - 1 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}>
             <ChevronLeft size={20} />
           </button>
 
@@ -254,24 +254,24 @@ export function ArchiveView() {
                   }}
                   autoFocus
                   onBlur={() => setIsEditingName(false)}
-                  className="text-[22px] font-bold text-[#355C7D] tracking-tight leading-none text-center bg-transparent border-b-2 border-[#355C7D] focus:outline-none w-48"
+                  className="text-[22px] font-bold text-foreground tracking-tight leading-none text-center bg-transparent border-b-2 border-primary focus:outline-none w-48"
                 />
               </div>
             ) : (
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-[22px] font-bold text-[#355C7D] tracking-tight leading-none">{cycle.cycleName || "Budget Cycle"}</h2>
+                <h2 className="text-[22px] font-bold text-foreground tracking-tight leading-none">{cycle.cycleName || "Budget Cycle"}</h2>
                 <button 
                   onClick={() => {
                     setEditNameValue(cycle.cycleName || "Budget Cycle");
                     setIsEditingName(true);
                   }}
-                  className="text-[#6C5B7B]/50 hover:text-[#355C7D] transition-colors"
+                  className="text-muted-foreground/50 hover:text-foreground transition-colors"
                 >
                   <Edit2 size={14} />
                 </button>
               </div>
             )}
-            <span className="text-[11px] font-bold text-[#6C5B7B]/60 uppercase tracking-widest">
+            <span className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-widest">
               {cycleStartFormatted} <span className="mx-1.5 font-normal opacity-50">→</span> {cycleEndFormatted}
             </span>
           </div>
@@ -279,25 +279,25 @@ export function ArchiveView() {
           <button 
             onClick={() => setCurrentCycleIndex(Math.max(currentCycleIndex - 1, 0))}
             disabled={currentCycleIndex === 0}
-            className={`w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm border border-gray-100 text-[#6C5B7B] transition-all ${currentCycleIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}>
+            className={`w-10 h-10 bg-card rounded-full flex items-center justify-center shadow-neu-extrude border border-border text-muted-foreground transition-all ${currentCycleIndex === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}>
             <ChevronRight size={20} />
           </button>
         </div>
 
-        <div className="bg-white rounded-[32px] p-7 shadow-[0_12px_40px_-12px_rgba(53,92,125,0.08)] border border-gray-50 flex flex-col relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#F8B195]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="bg-card rounded-[32px] p-7 shadow-neu-outer border border-border flex flex-col relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-accent-soft/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
 
           {/* Header Row */}
           <div className="flex items-center justify-between mb-4 relative z-10">
-            <span className="text-[11px] font-bold text-[#6C5B7B]/50 uppercase tracking-[0.15em]">Remaining Balance</span>
-            <div className="bg-[#355C7D]/5 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-[#355C7D]/10">
-              <span className="text-[10px] font-bold text-[#355C7D] uppercase tracking-widest">{recordedDaysCount} Days Logged</span>
+            <span className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-[0.15em]">Remaining Balance</span>
+            <div className="bg-primary/5 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-primary/10">
+              <span className="text-[10px] font-bold text-foreground uppercase tracking-widest">{recordedDaysCount} Days Logged</span>
             </div>
           </div>
 
           {/* Hero Balance */}
           <div className="mb-8 relative z-10">
-            <span className={`text-[56px] font-bold leading-none tracking-tighter flex items-start ${cycleRemaining >= 0 ? 'text-[#355C7D]' : 'text-red-500'}`}>
+            <span className={`text-[56px] font-bold leading-none tracking-tighter flex items-start ${cycleRemaining >= 0 ? 'text-foreground' : 'text-error'}`}>
               <span className="text-[28px] mt-1.5 mr-1 opacity-50 font-semibold">{currencySymbol}</span>
               {formatNumber(cycleRemaining).split('.')[0]}
               {formatNumber(cycleRemaining).includes('.') && (
@@ -307,29 +307,29 @@ export function ArchiveView() {
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-5 relative z-10">
+          <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-5 relative z-10">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${Math.min((cycleTotalExpenses / cycleBudget) * 100, 100)}%` }}
               transition={{ duration: 1.2, ease: "easeOut", delay: 0.1 }}
-              className={`h-full rounded-full ${cycleRemaining < 0 ? 'bg-red-500' : 'bg-[#F67280]'}`}
+              className={`h-full rounded-full ${cycleRemaining < 0 ? 'bg-red-500' : 'bg-accent-warm'}`}
             />
           </div>
 
           {/* Stats Footer */}
           <div className="flex justify-between items-center relative z-10">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-[#6C5B7B]/50 uppercase tracking-widest mb-1">Total Spent</span>
-              <span className="text-[16px] font-bold text-[#F67280] tracking-tight">{formatAmount(cycleTotalExpenses)}</span>
+              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Total Spent</span>
+              <span className="text-[16px] font-bold text-accent-warm tracking-tight">{formatAmount(cycleTotalExpenses)}</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-bold text-[#6C5B7B]/50 uppercase tracking-widest mb-1">Cycle Budget</span>
-              <span className="text-[16px] font-bold text-[#355C7D] tracking-tight">{formatAmount(cycleBudget)}</span>
+              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Cycle Budget</span>
+              <span className="text-[16px] font-bold text-foreground tracking-tight">{formatAmount(cycleBudget)}</span>
             </div>
           </div>
         </div>
 
-        <p className="text-[13px] font-medium text-[#6C5B7B] text-center px-4 -mt-2">Select one or more days to generate a cycle summary.</p>
+        <p className="text-[13px] font-medium text-muted-foreground text-center px-4 -mt-2">Select one or more days to generate a cycle summary.</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -337,29 +337,29 @@ export function ArchiveView() {
           const formattedDate = formatJournalDate(journal.date);
           const isSelected = selectedDates.includes(formattedDate.fullDate);
 
-          let intensityClass = 'bg-white';
-          let textClass = 'text-[#355C7D]';
+          let intensityClass = 'bg-card';
+          let textClass = 'text-foreground';
           let borderClass = 'border-transparent shadow-[0_4px_16px_-4px_rgba(0,0,0,0.04)]';
 
           if (journal.totalSpent > 500) {
-            intensityClass = 'bg-[#F67280]/15';
-            textClass = 'text-[#C06C84]';
+            intensityClass = 'bg-accent-warm/15';
+            textClass = 'text-accent-deep';
           } else if (journal.totalSpent > 200) {
-            intensityClass = 'bg-[#F8B195]/20';
-            textClass = 'text-[#F67280]';
+            intensityClass = 'bg-accent-soft/20';
+            textClass = 'text-accent-warm';
           } else if (journal.totalSpent > 0) {
-            intensityClass = 'bg-[#355C7D]/5';
-            textClass = 'text-[#355C7D]';
+            intensityClass = 'bg-primary/5';
+            textClass = 'text-foreground';
           } else {
-            intensityClass = 'bg-gray-50/50 opacity-60';
+            intensityClass = 'bg-muted/50 opacity-60';
             textClass = 'text-gray-400';
             borderClass = 'border-transparent shadow-none';
           }
 
           if (isSelected) {
-            intensityClass = 'bg-[#355C7D]';
+            intensityClass = 'bg-primary';
             textClass = 'text-white';
-            borderClass = 'border-[#F8B195]/30 shadow-[0_16px_32px_-8px_rgba(53,92,125,0.4)] ring-2 ring-[#355C7D]/20';
+            borderClass = 'border-accent-soft/30 shadow-neu-card ring-2 ring-primary/20';
           }
 
           return (
@@ -423,10 +423,10 @@ export function ArchiveView() {
             >
               <Drawer.Trigger asChild>
                 <button
-                  className="w-full bg-[#355C7D] text-white py-4 px-6 rounded-2xl font-bold flex items-center justify-between shadow-[0_8px_32px_-8px_rgba(53,92,125,0.5)] hover:bg-[#2A4A65] active:scale-[0.98] transition-all"
+                  className="w-full bg-accent text-accent-foreground py-4 px-6 rounded-2xl font-bold flex items-center justify-between shadow-neu-extrude hover:scale-[0.98] active:scale-[0.95] transition-all"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="bg-white/20 px-2.5 py-0.5 rounded-full text-sm">
+                    <span className="bg-card/20 px-2.5 py-0.5 rounded-full text-sm">
                       {selectedDates.length} {selectedDates.length === 1 ? 'day' : 'days'}
                     </span>
                   </span>
@@ -438,15 +438,15 @@ export function ArchiveView() {
               </Drawer.Trigger>
 
               <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 bg-[#355C7D]/20 backdrop-blur-sm z-50" />
-                <Drawer.Content className="bg-gray-50 flex flex-col rounded-t-[32px] max-h-[85vh] h-auto mt-24 fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
-                  <div className="p-4 bg-white rounded-t-[32px] flex-shrink-0 border-b border-gray-100 relative">
-                    <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-gray-200 mb-6" />
+                <Drawer.Overlay className="fixed inset-0 bg-primary/20 backdrop-blur-sm z-50" />
+                <Drawer.Content className="bg-muted flex flex-col rounded-t-[32px] max-h-[85vh] h-auto mt-24 fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
+                  <div className="p-4 bg-card rounded-t-[32px] flex-shrink-0 border-b border-border relative">
+                    <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-border mb-6" />
                     <div className="flex items-center justify-between px-2">
                       <div className="w-8" /> {/* Placeholder for balance */}
-                      <Drawer.Title className="text-xl font-bold text-[#355C7D] absolute left-1/2 -translate-x-1/2">Expense Summary</Drawer.Title>
+                      <Drawer.Title className="text-xl font-bold text-foreground absolute left-1/2 -translate-x-1/2">Expense Summary</Drawer.Title>
                       <Drawer.Close asChild>
-                        <button className="p-2 bg-gray-50 hover:bg-gray-100 rounded-full text-[#6C5B7B] transition-colors">
+                        <button className="p-2 bg-muted hover:bg-muted rounded-full text-muted-foreground transition-colors">
                           <X size={20} />
                         </button>
                       </Drawer.Close>
@@ -454,40 +454,40 @@ export function ArchiveView() {
                   </div>
 
                   <div className="overflow-y-auto hide-scrollbar pb-10">
-                    <div className="px-6 pt-2 pb-5 bg-white border-b border-gray-100 flex flex-wrap gap-2 justify-center">
+                    <div className="px-6 pt-2 pb-5 bg-card border-b border-border flex flex-wrap gap-2 justify-center">
                       {selectedDates.map(dateStr => {
                         const d = new Date(`${dateStr}T12:00:00Z`);
                         return (
-                          <div key={dateStr} className="px-3.5 py-1.5 bg-[#F9FAFB] border border-gray-200 rounded-full text-[13px] font-semibold text-[#6C5B7B] shadow-sm">
+                          <div key={dateStr} className="px-3.5 py-1.5 bg-card border border-border rounded-full text-[13px] font-semibold text-muted-foreground shadow-neu-extrude">
                             {formatJournalDate(d).date} {formatJournalDate(d).month}
                           </div>
                         );
                       })}
                     </div>
 
-                    <div className="px-6 py-8 flex flex-col items-center justify-center text-center bg-white rounded-b-[32px] shadow-[0_12px_32px_-12px_rgba(108,91,123,0.08)] relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-64 h-64 bg-[#F8B195]/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
-                      <span className="text-xs font-bold text-[#6C5B7B]/70 uppercase tracking-[0.2em] mb-2">Total Spent</span>
+                    <div className="px-6 py-8 flex flex-col items-center justify-center text-center bg-card rounded-b-[32px] shadow-neu-card relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-accent-soft/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
+                      <span className="text-xs font-bold text-muted-foreground/70 uppercase tracking-[0.2em] mb-2">Total Spent</span>
                       <AnimatedCounter value={totalCombinedSpending} symbol={currencySymbol} />
                     </div>
 
                     <div className="px-6 py-4">
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
-                          <span className="text-[10px] font-bold text-[#6C5B7B]/70 uppercase tracking-widest mb-1">Transactions</span>
-                          <span className="text-xl font-bold text-[#355C7D]">
+                        <div className="bg-card p-3 rounded-2xl shadow-neu-extrude border border-border flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                          <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mb-1">Transactions</span>
+                          <span className="text-xl font-bold text-foreground">
                             {selectedDaysData.reduce((acc, j) => acc + j.transactionCount, 0)}
                           </span>
                         </div>
-                        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
-                          <span className="text-[10px] font-bold text-[#6C5B7B]/70 uppercase tracking-widest mb-1">Days</span>
-                          <span className="text-xl font-bold text-[#355C7D]">{selectedDates.length}</span>
+                        <div className="bg-card p-3 rounded-2xl shadow-neu-extrude border border-border flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                          <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mb-1">Days</span>
+                          <span className="text-xl font-bold text-foreground">{selectedDates.length}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="px-6 pb-8">
-                      <h3 className="text-lg font-bold text-[#355C7D] mb-6">Spending Distribution</h3>
+                      <h3 className="text-lg font-bold text-foreground mb-6">Spending Distribution</h3>
 
                       <div className="h-4 w-full rounded-full flex overflow-hidden mb-6 shadow-inner">
                         {drawerCategories.map((cat, i) => (
@@ -497,20 +497,20 @@ export function ArchiveView() {
 
                       <div className="flex flex-col gap-4">
                         {drawerCategories.map((cat, i) => (
-                          <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 relative overflow-hidden">
+                          <div key={i} className="bg-card p-4 rounded-2xl shadow-neu-extrude border border-border relative overflow-hidden">
                             <div className="flex items-center gap-4 mb-3 relative z-10">
                               <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: `${cat.color}15`, color: cat.color }}>
                                 <cat.icon size={18} strokeWidth={2.5} />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-[15px] font-semibold text-[#355C7D]">{cat.name}</h4>
+                                <h4 className="text-[15px] font-semibold text-foreground">{cat.name}</h4>
                                 <span className="text-[12px] font-semibold" style={{ color: cat.color }}>{cat.percent.toFixed(1)}%</span>
                               </div>
                               <div className="text-right shrink-0">
-                                <span className="font-semibold text-[#355C7D] text-lg">{formatAmount(cat.amount)}</span>
+                                <span className="font-semibold text-foreground text-lg">{formatAmount(cat.amount)}</span>
                               </div>
                             </div>
-                            <div className="absolute bottom-0 left-0 h-1 bg-gray-100 w-full">
+                            <div className="absolute bottom-0 left-0 h-1 bg-muted w-full">
                               <div className="h-full rounded-r-full" style={{ width: `${cat.percent}%`, backgroundColor: cat.color }} />
                             </div>
                           </div>
@@ -522,12 +522,12 @@ export function ArchiveView() {
                     <div className="px-6 pb-12 mt-4">
                       <button 
                         onClick={() => setIsDetailedOpen(!isDetailedOpen)}
-                        className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-gray-100 active:scale-[0.99] transition-transform"
+                        className="w-full flex items-center justify-between p-4 bg-card rounded-2xl shadow-neu-extrude border border-border active:scale-[0.99] transition-transform"
                       >
-                        <span className="font-bold text-[#355C7D]">Detailed Breakdown</span>
+                        <span className="font-bold text-foreground">Detailed Breakdown</span>
                         <ChevronDown 
                           size={20} 
-                          className={`text-[#6C5B7B] transition-transform duration-300 ${isDetailedOpen ? 'rotate-180' : ''}`} 
+                          className={`text-muted-foreground transition-transform duration-300 ${isDetailedOpen ? 'rotate-180' : ''}`} 
                         />
                       </button>
 
@@ -541,7 +541,7 @@ export function ArchiveView() {
                           >
                             {isFetchingTxs ? (
                               <div className="flex justify-center items-center py-8">
-                                <span className="text-[#6C5B7B] font-medium text-sm">Loading transactions...</span>
+                                <span className="text-muted-foreground font-medium text-sm">Loading transactions...</span>
                               </div>
                             ) : (
                               <div className="flex flex-col gap-6">
@@ -551,13 +551,13 @@ export function ArchiveView() {
 
                                 return (
                                   <div key={cat.categoryId} className="flex flex-col">
-                                    <div className="flex items-center justify-between mb-3 border-b border-gray-100 pb-2">
+                                    <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
                                       <div className="flex items-center gap-2">
                                         <cat.icon size={16} style={{ color: cat.color }} />
-                                        <span className="font-bold text-sm text-[#355C7D]">{cat.name}</span>
+                                        <span className="font-bold text-sm text-foreground">{cat.name}</span>
                                       </div>
                                       <div className="flex items-center gap-3">
-                                        <span className="text-xs text-[#6C5B7B]">{catTxs.length} txs</span>
+                                        <span className="text-xs text-muted-foreground">{catTxs.length} txs</span>
                                         <span className="font-bold text-sm" style={{ color: cat.color }}>{formatAmount(cat.amount)}</span>
                                       </div>
                                     </div>
@@ -565,17 +565,17 @@ export function ArchiveView() {
                                       {catTxs.map(tx => (
                                         <div key={tx.transactionId} className="flex justify-between items-start pl-2 gap-2">
                                           <div className="flex flex-col min-w-0 flex-1">
-                                            <span className="text-sm font-semibold text-[#355C7D] leading-tight truncate">{tx.title}</span>
-                                            <span className="text-[11px] text-[#6C5B7B] mt-0.5">
+                                            <span className="text-sm font-semibold text-foreground leading-tight truncate">{tx.title}</span>
+                                            <span className="text-[11px] text-muted-foreground mt-0.5">
                                               {tx.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                                               {tx.transactionDetails && tx.transactionDetails.quantity && (
-                                                <span className="ml-2 px-1.5 py-0.5 bg-gray-100 rounded text-[9px] uppercase tracking-wider">
+                                                <span className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[9px] uppercase tracking-wider">
                                                   Qty: {tx.transactionDetails.quantity}
                                                 </span>
                                               )}
                                             </span>
                                           </div>
-                                          <span className="font-bold text-sm text-[#F67280] whitespace-nowrap flex-shrink-0">
+                                          <span className="font-bold text-sm text-accent-warm whitespace-nowrap flex-shrink-0">
                                             {formatAmount(tx.amount)}
                                           </span>
                                         </div>

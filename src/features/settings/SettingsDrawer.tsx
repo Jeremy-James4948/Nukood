@@ -24,6 +24,7 @@ import { EditModal } from '../../components/ui/EditModal';
 import { ManageCategoriesDrawer } from './ManageCategoriesDrawer';
 import { ManageFastEntriesDrawer } from './ManageFastEntriesDrawer';
 import { Zap } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 interface SettingsDrawerProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const [editingConfig, setEditingConfig] = useState<{ key: string, title: string, type: 'text'|'number'|'toggle'|'date'|'select', value: any, description?: string, options?: { label: string; value: any; description?: string }[] } | null>(null);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isManageFastEntriesOpen, setIsManageFastEntriesOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const formatDateForInput = (date: Date) => {
     const d = new Date(date);
@@ -92,6 +94,10 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         }
 
         updates['budgetThresholds'] = { comfortable, onTrack, tight };
+      } else if (editingConfig.key === 'theme') {
+        setTheme(val);
+        setEditingConfig(null);
+        return; // Don't save this to Firebase settings since it's local
       } else {
         updates[editingConfig.key] = val;
       }
@@ -211,6 +217,29 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
       ]
     },
     {
+      title: 'Appearance (Phase 1 Testing)',
+      items: [
+        { 
+          icon: Palette, 
+          label: 'Theme',
+          value: theme || 'normal',
+          onClick: () => setEditingConfig({ 
+            key: 'theme', 
+            title: 'Select Theme', 
+            type: 'select', 
+            value: theme || 'normal',
+            description: 'Change the application theme globally.',
+            options: [
+              { label: 'Normal (Sand)', value: 'normal', description: 'Current Nukood Look' },
+              { label: 'Light Theme', value: 'light', description: 'Clean white setup' },
+              { label: 'Dark Theme', value: 'dark', description: 'Night mode' },
+              { label: 'Awesome Mode', value: 'awesome', description: 'Expressive and neon' }
+            ]
+          })
+        }
+      ]
+    },
+    {
       title: 'Account',
       items: [
         { 
@@ -231,18 +260,18 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
           <Drawer.Content 
-            className="bg-[#F9FAFB] flex flex-col rounded-t-[40px] mt-12 h-[95vh] fixed bottom-0 left-0 right-0 z-[101] max-w-[428px] mx-auto shadow-2xl"
+            className="bg-card flex flex-col rounded-t-[40px] mt-12 h-[95vh] fixed bottom-0 left-0 right-0 z-[101] max-w-[428px] mx-auto shadow-2xl"
             onInteractOutside={(e) => {
               if (editingConfig || isManageCategoriesOpen) {
                 e.preventDefault();
               }
             }}
           >
-            <div className="p-5 bg-white rounded-t-[40px] flex flex-col items-center shrink-0 border-b border-gray-100">
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-6" />
+            <div className="p-5 bg-card rounded-t-[40px] flex flex-col items-center shrink-0 border-b border-border">
+              <div className="w-12 h-1.5 bg-border rounded-full mb-6" />
               <div className="w-full flex justify-between items-center px-2">
-                <Drawer.Title className="text-3xl font-bold text-[#355C7D]">Settings</Drawer.Title>
-                <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-[#6C5B7B]">
+                <Drawer.Title className="text-3xl font-bold text-foreground">Settings</Drawer.Title>
+                <button onClick={onClose} className="p-2 bg-muted rounded-full text-muted-foreground">
                   <X size={20} />
                 </button>
               </div>
@@ -252,26 +281,26 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
             <div className="flex-1 overflow-y-auto hide-scrollbar p-6">
               {settingsSections.map((section, idx) => (
                 <div key={idx} className="mb-8">
-                  <h3 className="text-sm font-bold text-[#6C5B7B] uppercase tracking-wider mb-3 px-2">
+                  <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 px-2">
                     {section.title}
                   </h3>
-                  <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] overflow-hidden">
+                  <div className="bg-card rounded-2xl border border-border shadow-neu-extrude overflow-hidden">
                     {section.items.map((item, i) => (
                       <button
                         key={i}
                         onClick={item.onClick}
-                        className={`w-full p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors ${i !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
+                        className={`w-full p-4 flex items-center gap-4 hover:bg-muted transition-colors ${i !== section.items.length - 1 ? 'border-b border-border' : ''}`}
                       >
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#355C7D]/5 text-[#355C7D]">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/5 text-foreground">
                           <item.icon size={18} strokeWidth={2} />
                         </div>
-                        <span className="font-semibold text-[#355C7D]">{item.label}</span>
+                        <span className="font-semibold text-foreground">{item.label}</span>
 
                         {item.value && (
-                          <span className="ml-auto text-sm font-medium text-[#6C5B7B]">{item.value}</span>
+                          <span className="ml-auto text-sm font-medium text-muted-foreground">{item.value}</span>
                         )}
 
-                        <ChevronRight size={18} className={`text-gray-300 ${item.value ? 'ml-2' : 'ml-auto'}`} />
+                        <ChevronRight size={18} className={`text-muted-foreground/30 ${item.value ? 'ml-2' : 'ml-auto'}`} />
                       </button>
                     ))}
                   </div>

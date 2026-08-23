@@ -86,22 +86,22 @@ export function SnapshotWidget() {
   };
 
   // Neumorphic classes
-  const neuExtrude = "bg-[#F5F2EC] shadow-[6px_6px_12px_#dfddd6,-6px_-6px_12px_#ffffff]";
-  const neuIndent = "bg-[#F5F2EC] shadow-[inset_4px_4px_8px_#dfddd6,inset_-4px_-4px_8px_#ffffff]";
+  const neuExtrude = "bg-background shadow-neu-extrude";
+  const neuIndent = "bg-background shadow-neu-inset";
 
   return (
     <section className="relative w-full flex flex-col gap-10 pb-12 pt-4">
       
       {/* Top Section: Balance */}
       <div className="flex flex-col items-center relative mb-4">
-        <span className="text-[13px] font-bold text-[#9B968B] uppercase tracking-[0.2em] mb-4">Remaining Balance</span>
-        <div className="flex items-start text-[#6A6356]">
-          <span className="text-[36px] font-semibold mt-1 mr-2 text-[#9B968B]">{currencySymbol}</span>
+        <span className="text-[13px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4">Remaining Balance</span>
+        <div className="flex items-start text-foreground">
+          <span className="text-[36px] font-semibold mt-1 mr-2 text-muted-foreground">{currencySymbol}</span>
           <span className="text-[84px] font-bold tracking-tighter leading-none">
             {formatNumber(remainingBalance).split('.')[0]}
           </span>
           {formatNumber(remainingBalance).includes('.') && (
-            <span className="text-[36px] font-semibold mt-1 text-[#9B968B]">
+            <span className="text-[36px] font-semibold mt-1 text-muted-foreground">
               .{formatNumber(remainingBalance).split('.')[1]}
             </span>
           )}
@@ -115,7 +115,7 @@ export function SnapshotWidget() {
           <div className="w-14 h-14 rounded-full bg-[#E8D4C8] shadow-inner flex items-center justify-center text-[#C98B71] shrink-0 mb-3">
             <Wallet size={22} strokeWidth={2.5} />
           </div>
-          <span className="text-[11px] font-bold text-[#9B968B] uppercase tracking-widest leading-tight mb-1">
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest leading-tight mb-1">
             Spent This Month
           </span>
           <span className="text-[24px] font-bold text-[#C98B71] tracking-tight">
@@ -131,10 +131,10 @@ export function SnapshotWidget() {
           <div className="w-14 h-14 rounded-full bg-[#D4DFE8] shadow-inner flex items-center justify-center text-[#A9BDD0] shrink-0 mb-3">
             <PieChart size={22} strokeWidth={2.5} />
           </div>
-          <span className="text-[11px] font-bold text-[#9B968B] uppercase tracking-widest leading-tight mb-1">
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest leading-tight mb-1">
             Daily Budget
           </span>
-          <span className="text-[24px] font-bold text-[#6A6356] tracking-tight">
+          <span className="text-[24px] font-bold text-foreground tracking-tight">
             {formatAmount(dailyBudget)}
           </span>
         </button>
@@ -157,12 +157,12 @@ export function SnapshotWidget() {
                   const selectedCat = categories.find(c => c.name === activeCategory);
                   if (!selectedCat) return null;
                   return (
-                    <div className="flex flex-col items-center justify-center bg-white/95 backdrop-blur-md rounded-full w-[140px] h-[140px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-white">
+                    <div className="flex flex-col items-center justify-center bg-card/95 backdrop-blur-md rounded-full w-[140px] h-[140px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-border">
                       <div className="w-10 h-10 rounded-full flex items-center justify-center mb-1" style={{ backgroundColor: `${selectedCat.color}15`, color: selectedCat.color }}>
                         <selectedCat.icon size={20} strokeWidth={2.5} />
                       </div>
-                      <span className="text-[10px] font-bold text-[#9B968B] uppercase tracking-[0.15em] mt-1">{selectedCat.name}</span>
-                      <span className="text-[18px] font-bold text-[#6A6356] tracking-tight mt-0.5">{formatAmount(selectedCat.amount)}</span>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mt-1">{selectedCat.name}</span>
+                      <span className="text-[18px] font-bold text-foreground tracking-tight mt-0.5">{formatAmount(selectedCat.amount)}</span>
                     </div>
                   );
                 })()}
@@ -170,7 +170,7 @@ export function SnapshotWidget() {
             )}
           </AnimatePresence>
 
-          <svg className="w-full h-full -rotate-90 drop-shadow-sm z-10" viewBox="0 0 300 300">
+          <svg className="w-full h-full -rotate-90 drop-shadow-neu-extrude z-10" viewBox="0 0 300 300">
             <defs>
               <filter id="ring-shadow" x="-20%" y="-20%" width="140%" height="140%">
                 <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000000" floodOpacity="0.08" />
@@ -231,8 +231,8 @@ export function SnapshotWidget() {
                >
                  <div className="flex items-center gap-3">
                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                   <cat.icon size={18} className="text-[#9B968B]" />
-                   <span className="text-[14px] font-bold text-[#6A6356]">{cat.name}</span>
+                   <cat.icon size={18} className="text-muted-foreground" />
+                   <span className="text-[14px] font-bold text-foreground">{cat.name}</span>
                  </div>
                </button>
              );

@@ -33,7 +33,121 @@ Because the rest of the application (UI, transactions, cycles) depends solely on
 
 ---
 
-## 2. Financial Settings Architecture
+## 2. Onboarding Service Architecture
+
+### Overview
+
+The Onboarding Service is the single, authoritative entry point for converting a newly authenticated user into a fully initialized Nukood account.
+
+It receives the finalized onboarding configuration, validates it, creates the user's Financial Settings and first Financial Cycle atomically, and marks the account as initialized.
+
+The UI must never write directly to Firestore during onboarding. All initialization must pass through this service.
+
+### Location
+
+`src/services/onboarding.service.ts`
+
+### Entry Point
+
+```typescript
+OnboardingService.completeOnboarding(userId: string, input: OnboardingInput): Promise<OnboardingResult>
+```
+
+`userId` must always come from the application's auth layer — never from a value submitted by the UI.
+
+### Onboarding Input (`OnboardingInput`)
+
+The `OnboardingInput` interface represents the finalized answers from the Phase 2 questionnaire:
+
+```typescript
+interface OnboardingInput {
+  profileName?: string;       // Optional. Maps to FinancialSettings.profileName
+  monthlyBudget: number;      // Maps to FinancialSettings.monthlyBudget
+  cycleStartDate: Date;       // Maps to FinancialSettings.cycleConfiguration.startDate
+  cycleName: string;          // Maps to FinancialCycle.cycleName
+  carryForwardEnabled: boolean; // Maps to FinancialSettings.carryForwardEnabled
+}
+```
+
+### Validation
+
+All fields are validated before any Firestore operation:
+
+| Field | Rules |
+| :--- | :--- |
+| `monthlyBudget` | Must be a finite number. Must be >= 0. |
+| `cycleStartDate` | Must be a valid `Date`. Must not be `NaN`. |
+| `cycleName` | Must be a non-empty string (trimmed). Max 30 characters. |
+| `carryForwardEnabled` | Must be a `boolean`. |
+| `profileName` | Optional. If provided, must be a string. Max 50 characters. |
+
+Invalid input throws `OnboardingValidationError` (with a `.field` property) before any Firestore write occurs.
+
+### Initialization Flow
+
+```text
+completeOnboarding(userId, input)
+  │
+  ├── 1. Validate input (throws OnboardingValidationError if invalid)
+  ├── 2. Check isOnboarded — return existing state if already initialized (idempotent)
+  ├── 3. Normalize startDate to beginning-of-day
+  ├── 4. calculateCycleEndDate(startDate) — calendar-month arithmetic
+  ├── 5. Load global categories → build categorySummary for first cycle
+  ├── 6. writeBatch(db)
+  │       ├── set users/{userId}/settings/financial  (includes isOnboarded: true)
+  │       └── set users/{userId}/financialCycles/{cycleId}
+  └── 7. batch.commit() — atomic; all or nothing
+```
+
+### Cycle End Date Calculation (`calculateCycleEndDate`)
+
+The exported `calculateCycleEndDate(startDate: Date): Date` utility computes the last day of the first cycle using calendar-month arithmetic:
+
+```text
+endDate = (startDate + 1 calendar month) - 1 day
+
+Examples:
+  Aug 15 → Sep 14
+  Aug  1 → Aug 31
+  Jan 31 → Feb 27/28  (month-overflow clamped correctly)
+  Feb 29 → Mar 28     (leap year handled)
+```
+
+Simple day-addition (e.g. `+ 30 days`) is NOT used — the calculation correctly handles February, leap years, and months of varying length.
+
+### Idempotency
+
+`getUserInitializationState(userId)` is called before any write.
+
+- **`isOnboarded === true`** or **legacy user without the field** → return existing state immediately, no writes.
+- **`isOnboarded === false` or no settings document** → proceed with initialization.
+
+Calling `completeOnboarding()` twice is safe — the second call returns `wasAlreadyOnboarded: true` and creates no duplicate data.
+
+### Atomicity
+
+All writes (Financial Settings + First Financial Cycle + `isOnboarded = true`) are committed inside a single Firestore `writeBatch`. If the batch fails:
+
+- No writes land.
+- `isOnboarded` remains `false`.
+- The user is never falsely marked as initialized with missing data.
+
+### Existing User Protection
+
+The service never runs initialization against a user whose `getUserInitializationState()` returns `true`. Existing users (including legacy users without the `isOnboarded` field) are returned immediately with their unchanged data.
+
+### What the Onboarding Service Does NOT Do
+
+- Does not create Category records (Categories are global).
+- Does not create Template records (Templates are global).
+- Does not write Transaction data.
+- Does not modify the Financial Engine.
+- Does not handle login routing.
+- Does not render any UI.
+
+---
+
+## 3. Financial Settings Architecture
 
 ### Overview
 The Financial Settings entity acts as the application's financial configuration center.
@@ -63,6 +177,7 @@ Financial Settings is responsible for:
 - Configuring Budget Health Indicator thresholds.
 - Defining the application's display currency.
 - Configuring how Financial Cycles are created.
+- Tracking whether the user has completed initial account setup (`isOnboarded`).
 
 Financial Settings does **not** own any transactional or historical financial data.
 
@@ -132,6 +247,20 @@ Financial Settings does **not** own any transactional or historical financial da
     - **When enabled**: The application automatically creates the next Financial Cycle, applies the configured Monthly Budget, applies Carry Forward if enabled, and stores the Financial Cycle snapshot.
     - **When disabled**: The user must manually create the next Financial Cycle.
 
+#### `isOnboarded`
+- **Type**: Boolean (optional)
+- **Required**: No
+- **Default**: absent (treated as `true` for legacy users)
+- **Description**: Tracks whether the user has completed the initial account setup flow.
+- **Values**:
+  - `false`: User has authenticated but not yet completed onboarding. The Financial Engine must not auto-create default settings or cycles.
+  - `true`: User has completed onboarding. Account is fully initialized.
+  - absent: Legacy user created before this field existed. Treated as `true` by `getUserInitializationState()`.
+- **Set by**: `OnboardingService.completeOnboarding()` — set to `true` atomically alongside the first Financial Cycle write.
+- **Business Rules**:
+  - Must never be set to `true` before the first Financial Cycle has been successfully committed.
+  - Must never be changed back to `false` after being set to `true`.
+
 ### Relationships
 Financial Settings directly influences:
 - Financial Cycles
@@ -184,7 +313,7 @@ All real financial activity belongs inside Financial Cycle and Transaction docum
 
 ---
 
-## 3. Financial Cycles Architecture
+## 4. Financial Cycles Architecture
 
 ### Overview
 A Financial Cycle represents one complete budgeting period within the application.
@@ -357,7 +486,7 @@ Every transaction is assigned to exactly one Financial Cycle, making Financial C
 
 ---
 
-## 4. Categories Architecture
+## 5. Categories Architecture
 
 ### Overview
 Categories define the different types of financial activities that can be recorded within the application.
@@ -514,7 +643,7 @@ This separation ensures the backend remains modular, scalable and easy to mainta
 
 ---
 
-## 5. Transactions Architecture
+## 6. Transactions Architecture
 
 ### Overview
 This document defines the data contract for every transaction category within Nukood.
@@ -690,7 +819,7 @@ Future Categories should only require a new Category Data specification without 
 
 ---
 
-## 6. Fast Entries Architecture
+## 7. Fast Entries Architecture
 
 ### Overview
 Fast Entries provide a quick way to recreate frequently used Transactions.
@@ -789,7 +918,7 @@ Historical Transactions remain completely independent after creation.
 
 ---
 
-## 7. Transaction Lifecycle Service
+## 8. Transaction Lifecycle Service
 
 ### Overview
 The Transaction Lifecycle Service is responsible for managing the complete lifecycle of every Transaction within Nukood.
@@ -935,7 +1064,7 @@ The service must gracefully handle:
 
 ---
 
-## 8. Daily Journals Architecture
+## 9. Daily Journals Architecture
 
 ### Overview
 

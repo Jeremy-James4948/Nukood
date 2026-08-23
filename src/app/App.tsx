@@ -7,6 +7,7 @@ import { DailyCardCarousel } from '../features/dashboard/DailyCardCarousel';
 import { SnapshotWidget } from '../features/snapshot/SnapshotWidget';
 import { FinancialEngineProvider } from '../context/FinancialEngineContext';
 import { TemplateService } from '../services/template.service';
+import { ThemeEffectsLayer } from '../components/layout/ThemeEffectsLayer';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Journal');
@@ -17,13 +18,14 @@ export default function App() {
 
   return (
     <FinancialEngineProvider>
-      <div className="min-h-screen bg-[#F5F2EC] flex items-center justify-center font-sans antialiased selection:bg-[#A9BDD0] selection:text-white">
+      <div className="min-h-screen bg-background flex items-center justify-center font-sans antialiased selection:bg-accent selection:text-accent-foreground text-foreground">
         {/* Mobile Device Simulation Container */}
-        <div className="w-full max-w-[428px] h-full sm:h-[926px] bg-[#F5F2EC] sm:rounded-[3rem] sm:shadow-[16px_16px_32px_#dfddd6,-16px_-16px_32px_#ffffff] relative overflow-hidden flex flex-col transform-gpu">
+        <div className="w-full max-w-[428px] h-full sm:h-[926px] bg-background sm:rounded-[3rem] sm:shadow-neu-outer relative overflow-hidden flex flex-col transform-gpu">
           
+          <ThemeEffectsLayer />
           {/* Top Fade Mask for Scrolling Content */}
-          <div className="absolute top-0 left-0 right-0 h-24 bg-[#F5F2EC] z-30 pointer-events-none" />
-          <div className="absolute top-24 left-0 right-0 h-12 bg-gradient-to-b from-[#F5F2EC] to-transparent z-30 pointer-events-none" />
+          <div className="absolute top-0 left-0 right-0 h-24 bg-background z-30 pointer-events-none" />
+          <div className="absolute top-24 left-0 right-0 h-12 bg-gradient-to-b from-background to-transparent z-30 pointer-events-none" />
           
           {/* Floating Utilities */}
           <FloatingUtilities />

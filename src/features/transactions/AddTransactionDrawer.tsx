@@ -276,16 +276,16 @@ export function AddTransactionDrawer({
   return (
     <Drawer.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-[#355C7D]/20 backdrop-blur-md z-[200]" />
-        <Drawer.Content className="bg-[#F9FAFB] flex flex-col rounded-t-[40px] mt-12 h-[95vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none">
+        <Drawer.Overlay className="fixed inset-0 bg-primary/20 backdrop-blur-md z-[200]" />
+        <Drawer.Content className="bg-card flex flex-col rounded-t-[40px] mt-12 h-[95vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none">
 
-          <div className="pt-6 pb-2 px-8 flex flex-col items-center shrink-0 relative bg-white rounded-t-[40px]">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-6" />
+          <div className="pt-6 pb-2 px-8 flex flex-col items-center shrink-0 relative bg-card rounded-t-[40px]">
+            <div className="w-12 h-1.5 bg-border rounded-full mb-6" />
 
             {step === 'FORM' && !editTransaction && (
               <button
                 onClick={() => setStep('SELECT_CATEGORY')}
-                className="absolute top-6 left-6 p-2 bg-gray-50 rounded-full text-[#6C5B7B] hover:bg-gray-100 transition-colors"
+                className="absolute top-6 left-6 p-2 bg-muted rounded-full text-muted-foreground hover:bg-muted transition-colors"
               >
                 <ChevronLeft size={20} />
               </button>
@@ -293,18 +293,18 @@ export function AddTransactionDrawer({
 
             <button
               onClick={handleClose}
-              className="absolute top-6 right-6 p-2 bg-gray-50 rounded-full text-[#6C5B7B] hover:bg-gray-100 transition-colors"
+              className="absolute top-6 right-6 p-2 bg-muted rounded-full text-muted-foreground hover:bg-muted transition-colors"
             >
               <X size={20} />
             </button>
 
-            <Drawer.Title className="text-2xl font-bold text-[#355C7D] mb-4">
+            <Drawer.Title className="text-2xl font-bold text-foreground mb-4">
               {step === 'SELECT_CATEGORY' ? 'New Transaction' : (editTransaction ? `Edit ${activeCategory?.name}` : activeCategory?.name)}
             </Drawer.Title>
             <Drawer.Description className="sr-only">Add or edit a transaction</Drawer.Description>
           </div>
 
-          <div className="flex-1 overflow-y-auto hide-scrollbar bg-[#F9FAFB]" data-vaul-no-drag>
+          <div className="flex-1 overflow-y-auto hide-scrollbar bg-card" data-vaul-no-drag>
             <AnimatePresence mode="wait">
 
               {/* STEP 1: CATEGORY SELECTION */}
@@ -320,18 +320,18 @@ export function AddTransactionDrawer({
                   {/* Fast Entries */}
                   {fastEntries.length > 0 && (
                     <div className="mb-8">
-                      <span className="text-[11px] font-bold text-[#6C5B7B]/50 uppercase tracking-widest mb-4 block pl-2">Fast Entries</span>
+                      <span className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-4 block pl-2">Fast Entries</span>
                       <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2 px-1">
                         {fastEntries.map(entry => (
                           <button
                             key={entry.fastEntryId}
                             onClick={() => handleSelectFastEntry(entry)}
-                            className="shrink-0 flex items-center gap-2.5 px-5 py-3.5 bg-white border border-[#355C7D]/10 rounded-[24px] shadow-sm hover:border-[#355C7D]/30 hover:scale-[0.98] transition-all"
+                            className="shrink-0 flex items-center gap-2.5 px-5 py-3.5 bg-card border border-primary/10 rounded-[24px] shadow-neu-extrude hover:border-primary/30 hover:scale-[0.98] transition-all"
                           >
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#355C7D] to-[#2A4A65] flex items-center justify-center shadow-sm">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#355C7D] to-[#2A4A65] flex items-center justify-center shadow-neu-extrude">
                               <Zap size={14} className="text-white fill-white/20" />
                             </div>
-                            <span className="text-[15px] font-bold text-[#355C7D] whitespace-nowrap">{entry.displayName}</span>
+                            <span className="text-[15px] font-bold text-foreground whitespace-nowrap">{entry.displayName}</span>
                           </button>
                         ))}
                       </div>
@@ -340,8 +340,8 @@ export function AddTransactionDrawer({
 
                   {/* Browse Categories */}
                   <div>
-                    <span className="text-[11px] font-bold text-[#6C5B7B]/50 uppercase tracking-widest mb-4 block pl-2">Browse Categories</span>
-                    <div className="bg-white rounded-[32px] p-2 shadow-sm border border-[#355C7D]/5">
+                    <span className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-4 block pl-2">Browse Categories</span>
+                    <div className="bg-card rounded-[32px] p-2 shadow-neu-extrude border border-primary/5">
                       {categories
                         .filter(cat => !(settings?.hiddenCategoryIds || []).includes(cat.categoryId))
                         .map((cat, idx, arr) => {
@@ -352,18 +352,18 @@ export function AddTransactionDrawer({
                           <button
                             key={cat.categoryId}
                             onClick={() => handleSelectCategory(cat)}
-                            className={`w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors ${!isLast ? 'border-b border-gray-50' : ''} ${idx === 0 ? 'rounded-t-[24px]' : ''} ${isLast ? 'rounded-b-[24px]' : ''}`}
+                            className={`w-full flex items-center justify-between p-4 hover:bg-muted transition-colors ${!isLast ? 'border-b border-border' : ''} ${idx === 0 ? 'rounded-t-[24px]' : ''} ${isLast ? 'rounded-b-[24px]' : ''}`}
                           >
                             <div className="flex items-center gap-4">
                               <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: `${cat.color}15`, color: cat.color }}>
                                 <Icon size={20} strokeWidth={2.5} />
                               </div>
                               <div className="flex flex-col items-start">
-                                <span className="text-[16px] font-bold text-[#355C7D]">{cat.name}</span>
-                                <span className="text-[12px] font-medium text-[#6C5B7B]/70">{cat.description}</span>
+                                <span className="text-[16px] font-bold text-foreground">{cat.name}</span>
+                                <span className="text-[12px] font-medium text-muted-foreground/70">{cat.description}</span>
                               </div>
                             </div>
-                            <ChevronRight size={20} className="text-[#6C5B7B]/30" />
+                            <ChevronRight size={20} className="text-muted-foreground/30" />
                           </button>
                         );
                       })}
@@ -383,39 +383,39 @@ export function AddTransactionDrawer({
                   className="p-6 flex flex-col gap-6 pb-32"
                 >
                   {/* Amount Input */}
-                  <div className="bg-white rounded-[32px] p-6 flex flex-col items-center justify-center shadow-sm border border-[#355C7D]/5">
-                    <span className="text-[13px] font-bold text-[#6C5B7B]/60 uppercase tracking-widest mb-2">Amount</span>
+                  <div className="bg-card rounded-[32px] p-6 flex flex-col items-center justify-center shadow-neu-extrude border border-primary/5">
+                    <span className="text-[13px] font-bold text-muted-foreground/60 uppercase tracking-widest mb-2">Amount</span>
                     <div className="flex items-center gap-1">
-                      <span className="text-[32px] font-bold text-[#355C7D]/40">{currencySymbol}</span>
+                      <span className="text-[32px] font-bold text-foreground/40">{currencySymbol}</span>
                       <input
                         type="number"
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
                         placeholder="0.00"
                         autoFocus
-                        className="text-[48px] font-bold text-[#355C7D] bg-transparent outline-none w-[180px] text-center placeholder:text-[#355C7D]/20"
+                        className="text-[48px] font-bold text-foreground bg-transparent outline-none w-[180px] text-center placeholder:text-foreground/20"
                       />
                     </div>
                   </div>
 
                   {/* Dynamic Fields based on Template */}
-                  <div className="bg-white rounded-[32px] p-6 shadow-sm border border-[#355C7D]/5 flex flex-col gap-5">
+                  <div className="bg-card rounded-[32px] p-6 shadow-neu-extrude border border-primary/5 flex flex-col gap-5">
                     {templates.find(t => t.categoryId === activeCategory.categoryId)?.fields.map(field => (
                       <div key={field.fieldId} className="flex flex-col gap-2">
-                        <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">{field.label}</label>
+                        <label className="text-[13px] font-bold text-muted-foreground/80 pl-1">{field.label}</label>
                         {(field.type === 'DROPDOWN' || field.type === 'dropdown') && field.options ? (
                           <div className="relative">
                             <select
                               value={formData[field.fieldId] || ''}
                               onChange={(e) => setFormData({ ...formData, [field.fieldId]: e.target.value })}
-                              className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none appearance-none focus:border-[#355C7D]/20 transition-colors"
+                              className="w-full bg-muted border border-border rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-foreground outline-none appearance-none focus:border-primary/20 transition-colors"
                             >
                               <option value="">Select...</option>
                               {field.options.map(opt => (
                                 <option key={opt} value={opt}>{opt}</option>
                               ))}
                             </select>
-                            <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6C5B7B]/50 pointer-events-none" />
+                            <ChevronDown size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
                           </div>
                         ) : (field.type === 'NUMBER' || field.type === 'number') ? (
                            <input
@@ -423,7 +423,7 @@ export function AddTransactionDrawer({
                             placeholder={field.label}
                             value={formData[field.fieldId] || ''}
                             onChange={(e) => setFormData({ ...formData, [field.fieldId]: e.target.value })}
-                            className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
+                            className="w-full bg-muted border border-border rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary/20 transition-colors"
                           />
                         ) : (
                           <div className="flex flex-col gap-2">
@@ -432,7 +432,7 @@ export function AddTransactionDrawer({
                               placeholder={field.label}
                               value={formData[field.fieldId] || ''}
                               onChange={(e) => setFormData({ ...formData, [field.fieldId]: e.target.value })}
-                              className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
+                              className="w-full bg-muted border border-border rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary/20 transition-colors"
                             />
                             {field.suggestions && field.suggestions.length > 0 && (
                               <div className="flex flex-wrap gap-2 mt-1">
@@ -441,7 +441,7 @@ export function AddTransactionDrawer({
                                     key={suggestion}
                                     type="button"
                                     onClick={() => setFormData({ ...formData, [field.fieldId]: suggestion })}
-                                    className="px-3 py-1.5 bg-[#F3F1EA] text-[#6C5B7B] text-[12px] font-bold rounded-full hover:bg-gray-200 transition-colors"
+                                    className="px-3 py-1.5 bg-card text-muted-foreground text-[12px] font-bold rounded-full hover:bg-border transition-colors"
                                   >
                                     {suggestion}
                                   </button>
@@ -455,41 +455,41 @@ export function AddTransactionDrawer({
                   </div>
 
                   {/* Standard Form Fields */}
-                  <div className="bg-white rounded-[32px] p-6 shadow-sm border border-[#355C7D]/5 flex flex-col gap-5">
+                  <div className="bg-card rounded-[32px] p-6 shadow-neu-extrude border border-primary/5 flex flex-col gap-5">
                     <div className="flex flex-col gap-2">
-                      <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">Transaction Title</label>
+                      <label className="text-[13px] font-bold text-muted-foreground/80 pl-1">Transaction Title</label>
                       <input
                         type="text"
                         placeholder={activeCategory.name}
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
+                        className="w-full bg-muted border border-border rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary/20 transition-colors"
                       />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">Date</label>
+                      <label className="text-[13px] font-bold text-muted-foreground/80 pl-1">Date</label>
                       <input
                         type="datetime-local"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none focus:border-[#355C7D]/20 transition-colors"
+                        className="w-full bg-muted border border-border rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-foreground outline-none focus:border-primary/20 transition-colors"
                       />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">Note (Optional)</label>
+                      <label className="text-[13px] font-bold text-muted-foreground/80 pl-1">Note (Optional)</label>
                       <input
                         type="text"
                         placeholder="Add a memo..."
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-[#355C7D] outline-none placeholder:text-[#6C5B7B]/40 focus:border-[#355C7D]/20 transition-colors"
+                        className="w-full bg-muted border border-border rounded-[16px] px-4 py-3.5 text-[15px] font-semibold text-foreground outline-none placeholder:text-muted-foreground/40 focus:border-primary/20 transition-colors"
                       />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-[13px] font-bold text-[#6C5B7B]/80 pl-1">Receipt Attachment</label>
+                      <label className="text-[13px] font-bold text-muted-foreground/80 pl-1">Receipt Attachment</label>
                       <div className="w-full">
                         {receiptFile || editTransaction?.receiptUrl ? (
-                          <div className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-[16px] px-4 py-3 text-[15px] font-semibold text-[#355C7D]">
+                          <div className="flex items-center justify-between bg-muted border border-border rounded-[16px] px-4 py-3 text-[15px] font-semibold text-foreground">
                             <span className="truncate flex-1 pr-4">
                               {receiptFile ? receiptFile.name : 'Attached Receipt'}
                             </span>
@@ -502,13 +502,13 @@ export function AddTransactionDrawer({
                                   // But typically clearing the file won't delete the old URL unless we specifically handle it.
                                 }
                               }}
-                              className="text-red-400 hover:text-red-500 text-xs font-bold"
+                              className="text-red-400 hover:text-error text-xs font-bold"
                             >
                               {receiptFile ? 'Remove' : 'View'}
                             </button>
                           </div>
                         ) : (
-                          <label className="flex items-center justify-center w-full bg-gray-50 border border-gray-100 border-dashed rounded-[16px] px-4 py-4 text-[14px] font-bold text-[#6C5B7B]/60 cursor-pointer hover:bg-gray-100 transition-colors">
+                          <label className="flex items-center justify-center w-full bg-muted border border-border border-dashed rounded-[16px] px-4 py-4 text-[14px] font-bold text-muted-foreground/60 cursor-pointer hover:bg-muted transition-colors">
                             <span>Upload File</span>
                             <input
                               type="file"
@@ -533,18 +533,18 @@ export function AddTransactionDrawer({
                   
                   {/* Save as Fast Entry Toggle (Only when creating) */}
                   {!editTransaction && (
-                    <div className="bg-white rounded-[24px] p-5 shadow-sm border border-[#355C7D]/5 flex items-center justify-between">
+                    <div className="bg-card rounded-[24px] p-5 shadow-neu-extrude border border-primary/5 flex items-center justify-between">
                       <div className="flex flex-col gap-1">
-                        <span className="text-[15px] font-bold text-[#355C7D]">Save as Fast Entry</span>
-                        <span className="text-[12px] font-medium text-[#6C5B7B]/70">Quickly add this exact transaction later</span>
+                        <span className="text-[15px] font-bold text-foreground">Save as Fast Entry</span>
+                        <span className="text-[12px] font-medium text-muted-foreground/70">Quickly add this exact transaction later</span>
                       </div>
                       <button
                         onClick={() => setSaveAsFastEntry(!saveAsFastEntry)}
-                        className={`w-14 h-8 rounded-full transition-colors relative flex items-center px-1 ${saveAsFastEntry ? 'bg-gradient-to-r from-[#355C7D] to-[#2A4A65]' : 'bg-gray-200'}`}
+                        className={`w-14 h-8 rounded-full transition-colors relative flex items-center px-1 ${saveAsFastEntry ? 'bg-gradient-to-r from-[#355C7D] to-[#2A4A65]' : 'bg-border'}`}
                       >
                         <motion.div
                           animate={{ x: saveAsFastEntry ? 24 : 0 }}
-                          className="w-6 h-6 rounded-full bg-white shadow-sm"
+                          className="w-6 h-6 rounded-full bg-card shadow-neu-extrude"
                         />
                       </button>
                     </div>

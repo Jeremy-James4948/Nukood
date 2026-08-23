@@ -59,14 +59,14 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white hover:text-gray-300"
+                  className="text-white hover:text-muted-foreground/30"
                 >
                   <ExternalLink size={24} />
                 </a>
               )}
               <button
                 onClick={onClose}
-                className="text-white hover:text-gray-300 bg-white/10 p-2 rounded-full"
+                className="text-white hover:text-muted-foreground/30 bg-card/10 p-2 rounded-full"
               >
                 <X size={24} />
               </button>
@@ -100,14 +100,14 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
                 {isPdf && (
                   <iframe
                     src={`${url}#toolbar=0`}
-                    className="w-full h-[80vh] rounded-xl bg-white"
+                    className="w-full h-[80vh] rounded-xl bg-card"
                     title={fileName}
                   />
                 )}
                 {!isImage && !isPdf && (
-                  <div className="text-white text-center bg-white/10 p-8 rounded-2xl">
+                  <div className="text-white text-center bg-card/10 p-8 rounded-2xl">
                     <p className="mb-4">Preview not available for this file type.</p>
-                    <a href={url} target="_blank" rel="noopener noreferrer" className="bg-[#355C7D] text-white px-6 py-3 rounded-full font-bold">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="bg-primary text-white px-6 py-3 rounded-full font-bold">
                       Download File
                     </a>
                   </div>

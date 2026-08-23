@@ -36,17 +36,17 @@ export function ManageCategoriesDrawer({ isOpen, onClose }: ManageCategoriesDraw
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[110]" />
         <Drawer.Content 
-          className="bg-[#F9FAFB] flex flex-col rounded-t-[40px] mt-12 h-[95vh] fixed bottom-0 left-0 right-0 z-[111] max-w-[428px] mx-auto shadow-2xl"
+          className="bg-card flex flex-col rounded-t-[40px] mt-12 h-[95vh] fixed bottom-0 left-0 right-0 z-[111] max-w-[428px] mx-auto shadow-2xl"
         >
-          <div className="p-5 bg-white rounded-t-[40px] flex flex-col items-center shrink-0 border-b border-gray-100">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mb-6" />
+          <div className="p-5 bg-card rounded-t-[40px] flex flex-col items-center shrink-0 border-b border-border">
+            <div className="w-12 h-1.5 bg-border rounded-full mb-6" />
             <div className="w-full flex justify-between items-center px-2">
-              <Drawer.Title className="text-3xl font-bold text-[#355C7D]">Categories</Drawer.Title>
-              <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-[#6C5B7B]">
+              <Drawer.Title className="text-3xl font-bold text-foreground">Categories</Drawer.Title>
+              <button onClick={onClose} className="p-2 bg-muted rounded-full text-muted-foreground">
                 <X size={20} />
               </button>
             </div>
-            <p className="w-full px-2 mt-2 text-sm text-[#6C5B7B] font-medium">
+            <p className="w-full px-2 mt-2 text-sm text-muted-foreground font-medium">
               Tap the eye icon to hide or show categories when adding a new transaction.
             </p>
           </div>
@@ -61,7 +61,7 @@ export function ManageCategoriesDrawer({ isOpen, onClose }: ManageCategoriesDraw
                 return (
                   <div
                     key={cat.categoryId}
-                    className={`bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-all ${
+                    className={`bg-card p-4 rounded-2xl shadow-neu-extrude border border-border flex items-center gap-4 transition-all ${
                       isHidden ? 'opacity-50 grayscale' : 'hover:shadow-md'
                     }`}
                   >
@@ -72,11 +72,11 @@ export function ManageCategoriesDrawer({ isOpen, onClose }: ManageCategoriesDraw
                       <Icon size={24} strokeWidth={2} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className={`font-bold text-lg truncate ${isHidden ? 'text-gray-400' : 'text-[#355C7D]'}`}>
+                      <h4 className={`font-bold text-lg truncate ${isHidden ? 'text-gray-400' : 'text-foreground'}`}>
                         {cat.name}
                       </h4>
                       {cat.description && (
-                        <p className={`text-sm truncate ${isHidden ? 'text-gray-400' : 'text-[#6C5B7B]'}`}>
+                        <p className={`text-sm truncate ${isHidden ? 'text-gray-400' : 'text-muted-foreground'}`}>
                           {cat.description}
                         </p>
                       )}
@@ -85,12 +85,12 @@ export function ManageCategoriesDrawer({ isOpen, onClose }: ManageCategoriesDraw
                       onClick={() => handleToggle(cat.categoryId)}
                       disabled={isToggling !== null}
                       className={`w-12 h-12 flex items-center justify-center rounded-full transition-colors ${
-                        isHidden ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'bg-[#355C7D]/10 text-[#355C7D] hover:bg-[#355C7D]/20'
+                        isHidden ? 'bg-muted text-muted-foreground hover:bg-border' : 'bg-primary/10 text-foreground hover:bg-primary/20'
                       }`}
                       aria-label={isHidden ? "Show category" : "Hide category"}
                     >
                       {isLoading ? (
-                         <div className="w-5 h-5 border-2 border-[#355C7D]/30 border-t-[#355C7D] rounded-full animate-spin" />
+                         <div className="w-5 h-5 border-2 border-primary/30 border-t-[#355C7D] rounded-full animate-spin" />
                       ) : isHidden ? (
                         <EyeOff size={22} />
                       ) : (

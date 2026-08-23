@@ -9,11 +9,17 @@ users
 └── {userId}
     └── settings
         └── financial
-            ├── monthlyBudget
-            ├── carryForwardEnabled
+            ├── profileName           // optional; set during onboarding
+            ├── monthlyBudget         // set during onboarding
+            ├── carryForwardEnabled   // set during onboarding
             ├── budgetThresholds
-            ├── currency
-            └── cycleConfiguration
+            ├── currency              // defaulted to "INR" during onboarding
+            ├── cycleConfiguration
+            │     ├── startDate       // set from user's chosen start date during onboarding
+            │     ├── cycleLengthDays
+            │     └── autoCreateNextCycle
+            ├── hiddenCategoryIds
+            └── isOnboarded           // false/absent = not yet onboarded; true = fully initialized
 ```
 
 ## 2. Financial Cycles

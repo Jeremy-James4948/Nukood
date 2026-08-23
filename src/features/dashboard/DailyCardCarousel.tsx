@@ -6,11 +6,13 @@ import { SettingsDrawer } from '../settings/SettingsDrawer';
 import { useCurrencyFormatter } from '../../utils/currency';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { IconMap } from '../../constants/icons';
+import { useThemeMotion } from '../../hooks/useThemeMotion';
 export function DailyCardCarousel() {
   const { formatAmount, formatNumber, currencySymbol } = useCurrencyFormatter();
   const { transactions, categories, dailyJournals } = useFinancialEngine();
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { variants } = useThemeMotion();
 
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -84,7 +86,7 @@ export function DailyCardCarousel() {
           id: tx.transactionId,
           name: tx.title,
           price: formatAmount(tx.amount),
-          icon: <IconComponent size={20} className="text-[#9B968B]" />,
+          icon: <IconComponent size={20} className="text-muted-foreground" />,
           time
         };
       });
@@ -137,14 +139,14 @@ export function DailyCardCarousel() {
   }, []);
 
   // Neumorphic utility classes
-  const bgBase = "bg-[#F3F1EA]";
-  const textPrimary = "text-[#6A6356]";
-  const textSecondary = "text-[#9B968B]";
-  
-  const neuCard = "bg-[#F3F1EA] shadow-[12px_12px_24px_#e3e0d8,-12px_-12px_24px_#ffffff]";
-  const neuExtrude = "bg-[#F3F1EA] shadow-[6px_6px_12px_#e3e0d8,-6px_-6px_12px_#ffffff]";
-  const neuExtrudeHover = "hover:shadow-[4px_4px_8px_#e3e0d8,-4px_-4px_8px_#ffffff] hover:scale-[0.98] transition-all";
-  const neuIndent = "bg-[#F3F1EA] shadow-[inset_4px_4px_8px_#e3e0d8,inset_-4px_-4px_8px_#ffffff]";
+  const bgBase = "bg-card";
+  const textPrimary = "text-foreground";
+  const textSecondary = "text-muted-foreground";
+
+  const neuCard = "bg-card shadow-neu-card";
+  const neuExtrude = "bg-card shadow-neu-extrude";
+  const neuExtrudeHover = "hover:scale-[0.98] transition-all";
+  const neuIndent = "bg-card shadow-neu-inset";
 
   return (
     <>
@@ -184,7 +186,7 @@ export function DailyCardCarousel() {
                       className="flex items-center gap-4 mt-4 mr-2 group cursor-pointer"
                     >
                       <div className="w-2.5 h-2.5 rounded-full bg-[#B9C9AF] shadow-[0_0_10px_#B9C9AF,inset_1px_1px_2px_rgba(255,255,255,0.8)]" />
-                      <div className={`text-[#9B968B] transition-transform duration-300 group-hover:rotate-45 group-hover:text-[#6A6356]`}>
+                      <div className={`text-muted-foreground transition-transform duration-300 group-hover:rotate-45 group-hover:text-foreground`}>
                          {/* Settings Icon SVG */}
                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="3"></circle>
@@ -246,10 +248,10 @@ export function DailyCardCarousel() {
                   {isToday && (
                     <div className="flex justify-center items-center mt-3 px-1 w-full">
                       <motion.button 
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95, boxShadow: "inset 4px 4px 8px #e3e0d8, inset -4px -4px 8px #ffffff" }}
+                        whileHover={variants.hoverScale}
+                        whileTap={variants.tapScale}
                         onClick={(e) => { e.stopPropagation(); handleOpenAddTx(); }}
-                        className={`w-full h-16 rounded-[20px] flex items-center justify-center gap-3 ${neuExtrude} text-[#6A6356] font-semibold tracking-wide shadow-[6px_6px_12px_#e3e0d8,-6px_-6px_12px_#ffffff]`}
+                        className={`w-full h-16 rounded-[20px] flex items-center justify-center gap-3 ${neuExtrude} text-foreground font-semibold tracking-wide`}
                       >
                         <motion.div
                           animate={{ rotate: [0, 90, 0] }}
@@ -276,7 +278,7 @@ export function DailyCardCarousel() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedCard(null)}
-              className="absolute inset-0 bg-[#355C7D]/20 backdrop-blur-sm cursor-pointer"
+              className="absolute inset-0 bg-primary/20 backdrop-blur-sm cursor-pointer"
             />
             
             {(() => {
@@ -286,13 +288,13 @@ export function DailyCardCarousel() {
               return (
                 <motion.div
                   layoutId={`card-${activeData.id}`}
-                  className="relative w-[90vw] max-w-[400px] h-[80vh] max-h-[800px] bg-[#F3F1EA] rounded-[40px] shadow-2xl z-[201] flex flex-col p-8 overflow-hidden"
+                  className="relative w-[90vw] max-w-[400px] h-[80vh] max-h-[800px] bg-card rounded-[40px] shadow-2xl z-[201] flex flex-col p-8 overflow-hidden"
                 >
                   <button 
                     onClick={() => setSelectedCard(null)}
                     className="absolute top-6 right-6 p-2 rounded-full hover:bg-black/5 transition-colors z-10"
                   >
-                    <X size={24} className="text-[#6A6356]" />
+                    <X size={24} className="text-foreground" />
                   </button>
 
                   <div className="flex flex-col mb-8 mt-2 shrink-0">
@@ -334,7 +336,7 @@ export function DailyCardCarousel() {
                     </div>
                   )}
 
-                  <div className="w-full h-[1px] bg-[#9B968B]/20 mb-6 shrink-0" />
+                  <div className="w-full h-[1px] bg-muted-foreground/20 mb-6 shrink-0" />
 
                   <div className="flex flex-col shrink-0 mb-3">
                      <span className={`text-[12px] font-bold uppercase tracking-[0.15em] ${textSecondary}`}>Transactions</span>
@@ -359,7 +361,7 @@ export function DailyCardCarousel() {
                     {activeData.recent.length === 0 && (
                       <div className="flex flex-col items-center justify-center h-full text-center py-10">
                         <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${neuIndent}`}>
-                          <ShoppingBag size={24} className="text-[#9B968B] opacity-50" />
+                          <ShoppingBag size={24} className="text-muted-foreground opacity-50" />
                         </div>
                         <span className={`text-[14px] font-semibold ${textSecondary}`}>No transactions yet</span>
                       </div>

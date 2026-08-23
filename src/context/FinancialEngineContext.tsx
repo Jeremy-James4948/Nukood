@@ -78,6 +78,30 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
       setError(null);
 
       try {
+        // --- PHASE 3 ONBOARDING GUARD ---
+        // Check whether this user has completed onboarding before loading or
+        // auto-creating any financial data.  A new user who lands here mid-
+        // onboarding must NOT get default settings (budget 1500, cycle "Current
+        // Cycle") written over their chosen values.
+        //
+        // getUserInitializationState returns:
+        //   true  — settings doc exists with isOnboarded=true, OR legacy user
+        //           without the field (treated as already onboarded).
+        //   false — no settings doc, or isOnboarded is explicitly false.
+        const isOnboarded = await FinancialSettingsService.getUserInitializationState(userId);
+        if (!isOnboarded) {
+          // New user who has not yet completed onboarding.
+          // Leave settings and cycle null — the onboarding flow will
+          // call OnboardingService.completeOnboarding() to initialize them.
+          if (mounted) {
+            setSettings(null);
+            setActiveCycle(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+        // --- END ONBOARDING GUARD ---
+
         // 1. Fetch or Initialize Settings
         let currentSettings = await FinancialSettingsService.getSettings(userId);
         if (!currentSettings) {
@@ -218,7 +242,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [userId, isAuthenticated]); // Re-runs whenever the authenticated user changes
 
   const refreshCycle = async () => {
     try {

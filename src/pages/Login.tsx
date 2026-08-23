@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
@@ -15,7 +14,6 @@ export const Login: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { signIn } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,8 +22,11 @@ export const Login: React.FC = () => {
 
     try {
       await signIn(username, password);
-      // Navigation is handled by the router/auth guard, but we can explicitly navigate too
-      navigate('/', { replace: true });
+      // Routing is handled by the guard layer in main.tsx:
+      //   PublicOnlyRoute redirects authenticated users away from /login.
+      //   InitializedRoute / OnboardingRoute then route to the correct destination
+      //   based on the user's isOnboarded state.
+      // No explicit navigate() needed here.
     } catch (err: any) {
       setError(err.message || 'Invalid username or password.');
     } finally {

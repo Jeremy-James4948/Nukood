@@ -167,6 +167,39 @@ Reports use Financial Engine calculations together with Transaction data to gene
 - **Rule 7**: Remaining Balance is always calculated dynamically. It is never stored.
 - **Rule 8**: Daily Available Budget is always calculated dynamically. It is never stored.
 - **Rule 9**: Budget Health is always calculated dynamically. It is never stored.
+- **Rule 10**: The Financial Engine must not auto-initialize financial data (settings, cycle) for a user who has not yet completed onboarding. It checks `isOnboarded` before creating any defaults.
+
+## Onboarding Guard
+
+The `FinancialEngineProvider` checks `FinancialSettingsService.getUserInitializationState(userId)` at startup before loading or creating any financial data.
+
+```text
+User authenticated
+        ↓
+FinancialEngineContext initializes
+        ↓
+getUserInitializationState(userId)
+        │
+        ├── isOnboarded = true (or legacy user without field)
+        │       ↓
+        │   Load Settings → Load Active Cycle → Load Transactions → Dashboard
+        │
+        └── isOnboarded = false (new user)
+                ↓
+            settings = null, activeCycle = null
+                ↓
+            Onboarding UI presented
+                ↓
+            OnboardingService.completeOnboarding() called
+                ↓
+            Settings + Cycle created atomically
+                ↓
+            isOnboarded = true
+                ↓
+            FinancialEngine re-initializes → Dashboard
+```
+
+This guard prevents the engine from writing default values (`monthlyBudget: 1500`, cycle named `"Current Cycle"`) before the user has had a chance to choose their own configuration.
 
 ## Architecture Principles
 The Financial Engine is the single source of truth for all financial calculations.

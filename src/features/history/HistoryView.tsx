@@ -21,9 +21,9 @@ import { useCurrencyFormatter } from '../../utils/currency';
 import { AddTransactionDrawer } from '../transactions/AddTransactionDrawer';
 import { ReceiptViewer } from '../../components/ui/ReceiptViewer';
 
-const neuExtrude = "bg-[#F3F1EA] shadow-[6px_6px_12px_#e3e0d8,-6px_-6px_12px_#ffffff]";
-const neuExtrudeHover = "hover:shadow-[4px_4px_8px_#e3e0d8,-4px_-4px_8px_#ffffff] hover:scale-[0.98] transition-all";
-const neuIndent = "bg-[#F3F1EA] shadow-[inset_4px_4px_8px_#e3e0d8,inset_-4px_-4px_8px_#ffffff]";
+const neuExtrude = "bg-card shadow-neu-extrude";
+const neuExtrudeHover = "hover:shadow-neu-extrude hover:scale-[0.98] transition-all";
+const neuIndent = "bg-card shadow-neu-extrude";
 
 const TransactionItem = ({ tx, category, cycleName, onClick, onDelete, onEdit, delay }: { tx: Transaction, category?: Category, cycleName?: string, onClick: any, onDelete: any, onEdit: any, delay: number }) => {
   const controls = useAnimation();
@@ -59,11 +59,11 @@ const TransactionItem = ({ tx, category, cycleName, onClick, onDelete, onEdit, d
     >
       {/* Background swipe actions */}
       <div className="absolute inset-0 flex items-center justify-between px-6">
-        <div className="flex items-center gap-2 text-green-600">
+        <div className="flex items-center gap-2 text-success">
           <Edit2 size={20} />
           <span className="text-[13px] font-bold uppercase tracking-wide">Edit</span>
         </div>
-        <div className="flex items-center gap-2 text-red-500">
+        <div className="flex items-center gap-2 text-error">
           <span className="text-[13px] font-bold uppercase tracking-wide">Delete</span>
           <Trash2 size={20} />
         </div>
@@ -84,23 +84,23 @@ const TransactionItem = ({ tx, category, cycleName, onClick, onDelete, onEdit, d
           <IconComponent size={18} strokeWidth={2.5} />
         </div>
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <h4 className="text-[15px] font-bold text-[#6A6356] truncate mb-0.5 flex items-center gap-2">
+          <h4 className="text-[15px] font-bold text-foreground truncate mb-0.5 flex items-center gap-2">
             {tx.title}
-            {tx.fastEntryId && <Zap size={12} className="text-yellow-500" />}
-            {tx.receiptUrl && <Receipt size={12} className="text-blue-400" />}
+            {tx.fastEntryId && <Zap size={12} className="text-warning" />}
+            {tx.receiptUrl && <Receipt size={12} className="text-info" />}
           </h4>
-          <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#A39C8D] uppercase tracking-wide">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground uppercase tracking-wide">
             <span>{category?.name || 'Uncategorized'}</span>
             {cycleName && (
               <>
-                <span className="w-1 h-1 rounded-full bg-[#dfddd6]" />
-                <span className="text-[#8c8577]">{cycleName}</span>
+                <span className="w-1 h-1 rounded-full bg-muted-foreground" />
+                <span className="text-muted-foreground">{cycleName}</span>
               </>
             )}
           </div>
         </div>
         <div className="text-right shrink-0">
-          <span className={`text-lg font-bold tracking-tight ${tx.transactionType === 'INCOME' ? 'text-green-600' : 'text-[#6A6356]'}`}>
+          <span className={`text-lg font-bold tracking-tight ${tx.transactionType === 'INCOME' ? 'text-success' : 'text-foreground'}`}>
             {tx.transactionType === 'INCOME' ? '+' : ''}{formatAmount(tx.amount)}
           </span>
         </div>
@@ -108,18 +108,18 @@ const TransactionItem = ({ tx, category, cycleName, onClick, onDelete, onEdit, d
 
       {/* Delete Confirmation Overlay */}
       {showConfirm && (
-        <div className="absolute inset-0 z-20 bg-[#F3F1EA]/90 backdrop-blur-sm flex items-center justify-between px-6 rounded-[24px]">
-          <span className="text-[13px] font-bold text-[#6A6356] uppercase tracking-wide">Delete this?</span>
+        <div className="absolute inset-0 z-20 bg-card/90 backdrop-blur-sm flex items-center justify-between px-6 rounded-[24px]">
+          <span className="text-[13px] font-bold text-foreground uppercase tracking-wide">Delete this?</span>
           <div className="flex items-center gap-3">
             <button 
               onClick={() => { setShowConfirm(false); controls.start({ x: 0 }); }}
-              className={`px-4 py-2 rounded-full text-[13px] font-bold text-[#8c8577] ${neuExtrude}`}
+              className={`px-4 py-2 rounded-full text-[13px] font-bold text-muted-foreground ${neuExtrude}`}
             >
               Cancel
             </button>
             <button 
               onClick={() => { setShowConfirm(false); onDelete(tx.transactionId); }}
-              className={`px-4 py-2 rounded-full text-[13px] font-bold text-red-500 ${neuIndent}`}
+              className={`px-4 py-2 rounded-full text-[13px] font-bold text-error ${neuIndent}`}
             >
               Delete
             </button>
@@ -256,17 +256,17 @@ export function HistoryView() {
   });
 
   return (
-    <div className="px-6 flex flex-col min-h-full pb-40 pt-4 bg-[#F3F1EA]">
+    <div className="px-6 flex flex-col min-h-full pb-40 pt-4">
       {/* Page Header */}
       <div className="mb-8 flex flex-col">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-[32px] font-bold text-[#6A6356] tracking-tight leading-none">History</h2>
+          <h2 className="text-[32px] font-bold text-foreground tracking-tight leading-none">History</h2>
           
           {/* Cycle Selector */}
           <select 
             value={selectedCycleId || ''}
             onChange={(e) => setSelectedCycleId(e.target.value)}
-            className={`px-3 py-1.5 rounded-full text-[13px] font-bold text-[#6A6356] outline-none ${neuExtrude} appearance-none pr-8 relative bg-transparent`}
+            className={`px-3 py-1.5 rounded-full text-[13px] font-bold text-foreground outline-none ${neuExtrude} appearance-none pr-8 relative bg-transparent`}
             style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236A6356%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right .7rem top 50%', backgroundSize: '.65rem auto' }}
           >
             {cycles.map(c => (
@@ -288,7 +288,7 @@ export function HistoryView() {
                 if (isSearchExpanded && !searchQuery) setIsSearchExpanded(false);
                 else if (!isSearchExpanded) setIsSearchExpanded(true);
               }}
-              className="absolute left-0 w-12 h-12 flex items-center justify-center text-[#6A6356] z-10"
+              className="absolute left-0 w-12 h-12 flex items-center justify-center text-foreground z-10"
             >
               <Search size={18} />
             </button>
@@ -301,7 +301,7 @@ export function HistoryView() {
               onBlur={() => {
                 if (!searchQuery) setIsSearchExpanded(false);
               }}
-              className={`w-full h-full pl-12 pr-10 outline-none text-[15px] font-bold text-[#6A6356] placeholder:text-[#A39C8D] bg-transparent ${isSearchExpanded ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full h-full pl-12 pr-10 outline-none text-[15px] font-bold text-foreground placeholder:text-muted-foreground bg-transparent ${isSearchExpanded ? 'opacity-100' : 'opacity-0'}`}
               style={{ transition: 'opacity 0.2s' }}
             />
             
@@ -312,7 +312,7 @@ export function HistoryView() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 p-1 rounded-full bg-gray-200/50 text-[#6A6356]"
+                  className="absolute right-3 p-1 rounded-full bg-border/50 text-foreground"
                 >
                   <X size={14} />
                 </motion.button>
@@ -323,10 +323,10 @@ export function HistoryView() {
           {/* Filter Button */}
           <motion.button 
             animate={{ opacity: isSearchExpanded ? 0 : 1, x: isSearchExpanded ? 20 : 0 }}
-            className={`ml-4 w-12 h-12 rounded-[24px] shrink-0 flex items-center justify-center text-[#6A6356] relative transition-colors ${getActiveFilterCount() > 0 ? neuIndent : neuExtrude}`}
+            className={`ml-4 w-12 h-12 rounded-[24px] shrink-0 flex items-center justify-center text-foreground relative transition-colors ${getActiveFilterCount() > 0 ? neuIndent : neuExtrude}`}
             onClick={() => setIsFilterDrawerOpen(true)}
           >
-            <SlidersHorizontal size={18} className={getActiveFilterCount() > 0 ? "text-[#355C7D]" : ""} />
+            <SlidersHorizontal size={18} className={getActiveFilterCount() > 0 ? "text-foreground" : ""} />
             {getActiveFilterCount() > 0 && (
               <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-yellow-500 rounded-full border-2 border-[#F3F1EA]" />
             )}
@@ -342,26 +342,26 @@ export function HistoryView() {
               exit={{ opacity: 0, height: 0 }}
               className="flex overflow-x-auto hide-scrollbar gap-2.5 pb-4 -mx-6 px-6 snap-x"
             >
-              <button onClick={clearFilters} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-red-500 ${neuExtrude}`}>
+              <button onClick={clearFilters} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-error ${neuExtrude}`}>
                 Clear All
               </button>
               {filters.type !== 'ALL' && (
-                <button onClick={() => setFilters(f => ({ ...f, type: 'ALL' }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
+                <button onClick={() => setFilters(f => ({ ...f, type: 'ALL' }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-foreground flex items-center gap-2 ${neuIndent}`}>
                   {filters.type} <X size={12} />
                 </button>
               )}
               {filters.categoryId && (
-                <button onClick={() => setFilters(f => ({ ...f, categoryId: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
+                <button onClick={() => setFilters(f => ({ ...f, categoryId: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-foreground flex items-center gap-2 ${neuIndent}`}>
                   {categories.find(c => c.categoryId === filters.categoryId)?.name || 'Category'} <X size={12} />
                 </button>
               )}
               {filters.hasReceipt !== null && (
-                <button onClick={() => setFilters(f => ({ ...f, hasReceipt: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
+                <button onClick={() => setFilters(f => ({ ...f, hasReceipt: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-foreground flex items-center gap-2 ${neuIndent}`}>
                   {filters.hasReceipt ? 'Has Receipt' : 'No Receipt'} <X size={12} />
                 </button>
               )}
               {filters.isFastEntry !== null && (
-                <button onClick={() => setFilters(f => ({ ...f, isFastEntry: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-[#355C7D] flex items-center gap-2 ${neuIndent}`}>
+                <button onClick={() => setFilters(f => ({ ...f, isFastEntry: null }))} className={`snap-start shrink-0 px-4 py-2 rounded-[16px] text-[12px] font-bold text-foreground flex items-center gap-2 ${neuIndent}`}>
                   {filters.isFastEntry ? 'Fast Entry' : 'Manual Entry'} <X size={12} />
                 </button>
               )}
@@ -373,11 +373,11 @@ export function HistoryView() {
       {/* Grouped Transaction Timeline */}
       <div className="flex flex-col gap-8">
         {Object.keys(groupedHistory).length === 0 ? (
-          <div className="text-center text-[#A39C8D] font-medium mt-10">No transactions found.</div>
+          <div className="text-center text-muted-foreground font-medium mt-10">No transactions found.</div>
         ) : (
           Object.entries(groupedHistory).map(([date, txs], groupIdx) => (
             <div key={date} className="flex flex-col gap-3">
-              <span className="text-[11px] font-bold text-[#A39C8D] uppercase tracking-widest pl-2 block">
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-widest pl-2 block">
                 {date}
               </span>
 
@@ -411,14 +411,14 @@ export function HistoryView() {
       <Drawer.Root open={selectedTxInfo !== null} onOpenChange={(open) => !open && setSelectedTxInfo(null)}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 bg-black/10 backdrop-blur-sm z-[200]" />
-          <Drawer.Content className={`bg-[#F3F1EA] flex flex-col rounded-t-[40px] mt-12 max-h-[90vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none`}>
+          <Drawer.Content className={`bg-card flex flex-col rounded-t-[40px] mt-12 max-h-[90vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none`}>
 
             <div className={`pt-6 pb-2 px-8 flex flex-col items-center shrink-0 relative rounded-t-[40px]`}>
               <div className={`w-12 h-1.5 rounded-full mb-8 ${neuIndent}`} />
 
               <button
                 onClick={() => setSelectedTxInfo(null)}
-                className={`absolute top-6 right-6 p-2 rounded-full text-[#6A6356] ${neuExtrude}`}
+                className={`absolute top-6 right-6 p-2 rounded-full text-foreground ${neuExtrude}`}
               >
                 <X size={20} />
               </button>
@@ -431,14 +431,14 @@ export function HistoryView() {
                       return <IconComp size={28} strokeWidth={2.5} />
                     })()}
                   </div>
-                  <span className={`text-[40px] font-bold tracking-tighter leading-none mb-2 ${selectedTxInfo.tx.transactionType === 'INCOME' ? 'text-green-600' : 'text-[#6A6356]'}`}>
+                  <span className={`text-[40px] font-bold tracking-tighter leading-none mb-2 ${selectedTxInfo.tx.transactionType === 'INCOME' ? 'text-success' : 'text-foreground'}`}>
                     {selectedTxInfo.tx.transactionType === 'INCOME' ? '+' : ''}{formatAmount(selectedTxInfo.tx.amount)}
                   </span>
-                  <Drawer.Title className="text-[18px] font-bold text-[#6A6356]">{selectedTxInfo.tx.title}</Drawer.Title>
-                  <span className="text-[12px] font-bold text-[#A39C8D] uppercase tracking-widest mt-1">
+                  <Drawer.Title className="text-[18px] font-bold text-foreground">{selectedTxInfo.tx.title}</Drawer.Title>
+                  <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
                     {selectedTxInfo.category?.name || 'Uncategorized'} • {new Date(selectedTxInfo.tx.date).toLocaleDateString()}
                   </span>
-                  <div className={`mt-4 px-4 py-1.5 rounded-full text-[11px] font-bold text-[#8c8577] uppercase tracking-wider ${neuIndent}`}>
+                  <div className={`mt-4 px-4 py-1.5 rounded-full text-[11px] font-bold text-muted-foreground uppercase tracking-wider ${neuIndent}`}>
                     {cycles.find(c => c.cycleId === selectedTxInfo.tx.cycleId)?.cycleName || 'Unknown Cycle'}
                   </div>
                   <Drawer.Description className="sr-only">Transaction details</Drawer.Description>
@@ -452,17 +452,17 @@ export function HistoryView() {
 
                   {/* Metadata Block */}
                   <div>
-                    <span className="text-[11px] font-bold text-[#A39C8D] uppercase tracking-widest mb-3 block pl-2">Transaction Details</span>
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block pl-2">Transaction Details</span>
                     <div className={`rounded-[24px] flex flex-col p-3 gap-3 ${neuExtrude}`}>
                       <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-1 ${neuIndent}`}>
-                        <span className="text-[12px] font-bold text-[#8c8577] uppercase tracking-wider">Date & Time</span>
-                        <span className="text-[15px] font-bold text-[#6A6356]">{new Date(selectedTxInfo.tx.date).toLocaleString()}</span>
+                        <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Date & Time</span>
+                        <span className="text-[15px] font-bold text-foreground">{new Date(selectedTxInfo.tx.date).toLocaleString()}</span>
                       </div>
                       
                       {selectedTxInfo.tx.note && (
                         <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-1 ${neuIndent}`}>
-                          <span className="text-[12px] font-bold text-[#8c8577] uppercase tracking-wider">Notes</span>
-                          <span className="text-[15px] font-bold text-[#6A6356]">{selectedTxInfo.tx.note}</span>
+                          <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Notes</span>
+                          <span className="text-[15px] font-bold text-foreground">{selectedTxInfo.tx.note}</span>
                         </div>
                       )}
 
@@ -470,8 +470,8 @@ export function HistoryView() {
                       {selectedTxInfo.tx.transactionDetails?.receipt?.attached && (
                         <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-3 ${neuIndent}`}>
                           <div className="flex items-center justify-between">
-                            <span className="text-[12px] font-bold text-[#8c8577] uppercase tracking-wider">Receipt</span>
-                            <span className="text-[14px] font-bold text-[#6A6356]">Attached</span>
+                            <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Receipt</span>
+                            <span className="text-[14px] font-bold text-foreground">Attached</span>
                           </div>
                           <button
                             onClick={() => setReceiptViewerConfig({
@@ -480,7 +480,7 @@ export function HistoryView() {
                               fileName: selectedTxInfo.tx.transactionDetails.receipt.fileName,
                               fileType: selectedTxInfo.tx.transactionDetails.receipt.fileType,
                             })}
-                            className={`flex items-center justify-center gap-2 py-3 rounded-[12px] text-[14px] font-bold text-[#355C7D] transition-transform active:scale-[0.98] ${neuExtrude}`}
+                            className={`flex items-center justify-center gap-2 py-3 rounded-[12px] text-[14px] font-bold text-foreground transition-transform active:scale-[0.98] ${neuExtrude}`}
                           >
                             <ExternalLink size={16} />
                             View Receipt
@@ -490,7 +490,7 @@ export function HistoryView() {
                       
                       {selectedTxInfo.tx.fastEntryId && (
                          <div className={`flex items-center justify-between px-5 py-4 rounded-[16px] ${neuIndent}`}>
-                           <span className="text-[12px] font-bold text-[#8c8577] uppercase tracking-wider">Method</span>
+                           <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Method</span>
                            <span className="text-[14px] font-bold text-yellow-600 flex items-center gap-1.5"><Zap size={14}/> Fast Entry</span>
                          </div>
                       )}
@@ -499,14 +499,14 @@ export function HistoryView() {
 
                   {/* Actions Block */}
                   <div>
-                    <span className="text-[11px] font-bold text-[#A39C8D] uppercase tracking-widest mb-3 block pl-2">Actions</span>
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block pl-2">Actions</span>
                     <div className={`rounded-[24px] flex flex-col p-3 gap-3 ${neuExtrude}`}>
                       <button 
                         onClick={() => setIsEditDrawerOpen(true)}
                         className={`flex items-center gap-3 px-5 py-4 rounded-[16px] text-left transition-transform active:scale-[0.98] ${neuIndent}`}
                       >
-                        <Edit2 size={18} className="text-[#6A6356]" />
-                        <span className="text-[15px] font-bold text-[#6A6356]">Edit Transaction</span>
+                        <Edit2 size={18} className="text-foreground" />
+                        <span className="text-[15px] font-bold text-foreground">Edit Transaction</span>
                       </button>
                       <button
                         onClick={() => {
@@ -516,8 +516,8 @@ export function HistoryView() {
                         }}
                         className={`flex items-center gap-3 px-5 py-4 rounded-[16px] text-left transition-transform active:scale-[0.98] ${neuIndent}`}
                       >
-                        <Trash2 size={18} className="text-red-500" />
-                        <span className="text-[15px] font-bold text-red-500">Delete</span>
+                        <Trash2 size={18} className="text-error" />
+                        <span className="text-[15px] font-bold text-error">Delete</span>
                       </button>
                     </div>
                   </div>
@@ -554,14 +554,14 @@ export function HistoryView() {
       <Drawer.Root open={isFilterDrawerOpen} onOpenChange={setIsFilterDrawerOpen}>
         <Drawer.Portal>
           <Drawer.Overlay className="fixed inset-0 bg-black/10 backdrop-blur-sm z-[200]" />
-          <Drawer.Content className={`bg-[#F3F1EA] flex flex-col rounded-t-[40px] mt-12 h-[80vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none`}>
+          <Drawer.Content className={`bg-card flex flex-col rounded-t-[40px] mt-12 h-[80vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none`}>
             <div className="pt-6 pb-2 px-8 flex flex-col items-center shrink-0 relative rounded-t-[40px]">
               <div className={`w-12 h-1.5 rounded-full mb-6 ${neuIndent}`} />
-              <Drawer.Title className="text-2xl font-bold text-[#6A6356] mb-4">Filters</Drawer.Title>
+              <Drawer.Title className="text-2xl font-bold text-foreground mb-4">Filters</Drawer.Title>
               <Drawer.Description className="sr-only">Filter transactions</Drawer.Description>
               <button
                 onClick={() => setIsFilterDrawerOpen(false)}
-                className={`absolute top-6 right-6 p-2 rounded-full text-[#6A6356] ${neuExtrude}`}
+                className={`absolute top-6 right-6 p-2 rounded-full text-foreground ${neuExtrude}`}
               >
                 <X size={20} />
               </button>
@@ -572,13 +572,13 @@ export function HistoryView() {
                 
                 {/* Type Filter */}
                 <div>
-                  <span className="text-[12px] font-bold text-[#A39C8D] uppercase tracking-widest mb-4 block pl-2">Type</span>
+                  <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-4 block pl-2">Type</span>
                   <div className={`flex items-center p-1.5 rounded-[20px] ${neuExtrude}`}>
                     {['ALL', 'INCOME', 'EXPENSE'].map((t) => (
                       <button
                         key={t}
                         onClick={() => setFilters({ ...filters, type: t as any })}
-                        className={`flex-1 py-3 text-[13px] font-bold rounded-[16px] transition-all ${filters.type === t ? 'text-[#355C7D] ' + neuIndent : 'text-[#8c8577] hover:text-[#6A6356]'}`}
+                        className={`flex-1 py-3 text-[13px] font-bold rounded-[16px] transition-all ${filters.type === t ? 'text-foreground ' + neuIndent : 'text-muted-foreground hover:text-foreground'}`}
                       >
                         {t}
                       </button>
@@ -588,11 +588,11 @@ export function HistoryView() {
 
                 {/* Categories Filter */}
                 <div>
-                  <span className="text-[12px] font-bold text-[#A39C8D] uppercase tracking-widest mb-4 block pl-2">Category</span>
+                  <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-4 block pl-2">Category</span>
                   <div className="flex flex-wrap gap-3">
                     <button
                       onClick={() => setFilters({ ...filters, categoryId: null })}
-                      className={`px-5 py-3 rounded-[20px] text-[13px] font-bold transition-all ${filters.categoryId === null ? 'text-[#355C7D] ' + neuIndent : 'text-[#8c8577] ' + neuExtrude}`}
+                      className={`px-5 py-3 rounded-[20px] text-[13px] font-bold transition-all ${filters.categoryId === null ? 'text-foreground ' + neuIndent : 'text-muted-foreground ' + neuExtrude}`}
                     >
                       All Categories
                     </button>
@@ -600,7 +600,7 @@ export function HistoryView() {
                       <button
                         key={cat.categoryId}
                         onClick={() => setFilters({ ...filters, categoryId: cat.categoryId })}
-                        className={`px-5 py-3 rounded-[20px] text-[13px] font-bold transition-all ${filters.categoryId === cat.categoryId ? 'text-[#355C7D] ' + neuIndent : 'text-[#8c8577] ' + neuExtrude}`}
+                        className={`px-5 py-3 rounded-[20px] text-[13px] font-bold transition-all ${filters.categoryId === cat.categoryId ? 'text-foreground ' + neuIndent : 'text-muted-foreground ' + neuExtrude}`}
                       >
                         {cat.name}
                       </button>
@@ -610,19 +610,19 @@ export function HistoryView() {
 
                 {/* Attributes Filter */}
                 <div>
-                  <span className="text-[12px] font-bold text-[#A39C8D] uppercase tracking-widest mb-4 block pl-2">Attributes</span>
+                  <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest mb-4 block pl-2">Attributes</span>
                   <div className={`flex flex-col p-3 rounded-[24px] gap-3 ${neuExtrude}`}>
                     <div className="flex items-center justify-between px-4 py-3">
-                      <span className="text-[14px] font-bold text-[#6A6356]">Has Receipt</span>
+                      <span className="text-[14px] font-bold text-foreground">Has Receipt</span>
                       <button 
                         onClick={() => setFilters({ ...filters, hasReceipt: filters.hasReceipt === true ? null : true })}
-                        className={`w-12 h-6 rounded-full relative transition-all ${filters.hasReceipt ? neuIndent + ' bg-[#355C7D]/10' : neuIndent}`}
+                        className={`w-12 h-6 rounded-full relative transition-all ${filters.hasReceipt ? neuIndent + ' bg-primary/10' : neuIndent}`}
                       >
-                        <motion.div animate={{ x: filters.hasReceipt ? 24 : 4 }} className="w-4 h-4 rounded-full bg-[#355C7D] absolute top-1" />
+                        <motion.div animate={{ x: filters.hasReceipt ? 24 : 4 }} className="w-4 h-4 rounded-full bg-primary absolute top-1" />
                       </button>
                     </div>
                     <div className="flex items-center justify-between px-4 py-3">
-                      <span className="text-[14px] font-bold text-[#6A6356]">Fast Entry</span>
+                      <span className="text-[14px] font-bold text-foreground">Fast Entry</span>
                       <button 
                         onClick={() => setFilters({ ...filters, isFastEntry: filters.isFastEntry === true ? null : true })}
                         className={`w-12 h-6 rounded-full relative transition-all ${filters.isFastEntry ? neuIndent + ' bg-yellow-500/10' : neuIndent}`}
