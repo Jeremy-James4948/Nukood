@@ -54,31 +54,33 @@ export const BudgetSlide: React.FC<BudgetSlideProps> = ({
       primaryLabel="Continue"
       onPrimary={handleNext}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 items-center text-center w-full max-w-sm mx-auto mt-4">
         {/* Question */}
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-bold text-[#A49F96] uppercase tracking-widest">
+        <div className="flex flex-col gap-3 items-center">
+          <p className="text-[13px] font-bold text-accent uppercase tracking-[0.2em]">
             Monthly budget
           </p>
-          <h2 className="text-[28px] font-black text-foreground leading-snug tracking-tight">
-            How much would you like to budget for this cycle?
+          <h2 className="text-3xl font-semibold text-primary leading-snug tracking-wide" style={{ fontFamily: '"Playfair Display", serif' }}>
+            What is your spending limit?
           </h2>
-          <p className="text-[15px] text-foreground font-medium leading-relaxed">
-            You can always adjust this later in settings.
+          <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[280px]">
+            You can always adjust this later.
           </p>
         </div>
 
         {/* Big currency input */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 relative w-full">
+          <label htmlFor="monthlyBudget" className="sr-only">
+            Monthly budget in rupees
+          </label>
           <div
-            className={`flex items-center gap-3 rounded-[24px] bg-background px-6
-                        shadow-neu-card
-                        ${error ? 'ring-2 ring-red-300' : ''}`}
+            className={`flex items-center justify-center gap-2 h-[80px] rounded-3xl bg-white/50 border
+                        transition-all duration-300 relative z-0 focus-within:bg-white focus-within:shadow-md
+                        ${error ? 'border-error/50 bg-error/5' : ''}`}
+            style={{ borderColor: error ? undefined : 'var(--border)' }}
           >
-            <span className="text-[32px] font-black text-[#A49F96] select-none">₹</span>
-            <label htmlFor="monthlyBudget" className="sr-only">
-              Monthly budget in rupees
-            </label>
+            <span className="text-4xl font-light text-muted-foreground select-none mt-1">₹</span>
+            
             <input
               id="monthlyBudget"
               type="text"
@@ -88,22 +90,22 @@ export const BudgetSlide: React.FC<BudgetSlideProps> = ({
               onFocus={() => setError(null)}
               placeholder="15,000"
               autoFocus
-              className="flex-1 h-[72px] bg-transparent
-                         text-[32px] font-black text-foreground placeholder-[#D1CDC7]
-                         outline-none"
+              className="w-[180px] h-full bg-transparent text-center
+                         text-5xl font-semibold text-foreground placeholder:text-muted-foreground/30
+                         outline-none tracking-tight"
             />
           </div>
 
           {/* Live formatted preview */}
-          {displayFormatted && (
-            <p className="text-[15px] text-[#A49F96] font-semibold pl-2">
+          {displayFormatted && !error && (
+            <p className="text-[13px] text-muted-foreground font-medium mt-2 opacity-80">
               ₹{displayFormatted} per cycle
             </p>
           )}
 
           {/* Validation error */}
           {error && (
-            <p role="alert" className="text-[14px] text-error font-semibold pl-2">
+            <p role="alert" className="text-[13px] text-error font-medium mt-2">
               {error}
             </p>
           )}

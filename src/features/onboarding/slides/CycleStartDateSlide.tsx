@@ -58,64 +58,73 @@ export const CycleStartDateSlide: React.FC<CycleStartDateSlideProps> = ({
       primaryLabel="Continue"
       onPrimary={handleNext}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 items-center text-center w-full max-w-sm mx-auto mt-4">
         {/* Question */}
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-bold text-[#A49F96] uppercase tracking-widest">
+        <div className="flex flex-col gap-3 items-center">
+          <p className="text-[13px] font-bold text-accent uppercase tracking-[0.2em]">
             Cycle start date
           </p>
-          <h2 className="text-[28px] font-black text-foreground leading-snug tracking-tight">
-            When should your financial cycle begin?
+          <h2 className="text-3xl font-semibold text-primary leading-snug tracking-wide" style={{ fontFamily: '"Playfair Display", serif' }}>
+            When should your cycle begin?
           </h2>
-          <p className="text-[15px] text-foreground font-medium leading-relaxed">
-            Your cycle length is one calendar month.
+          <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[280px]">
+            Your cycle length is exactly one calendar month.
           </p>
         </div>
 
         {/* Date picker */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 w-full">
+          <label htmlFor="cycleStartDate" className="sr-only">
+            Cycle start date
+          </label>
+          
+          {/* Custom Date Input Wrapper */}
           <div
-            className={`relative flex items-center rounded-[20px] bg-background
-                        shadow-neu-card
-                        ${error ? 'ring-2 ring-red-300' : ''}`}
+            className={`relative flex items-center justify-center w-full h-[64px] rounded-2xl bg-white/50 border
+                        transition-all duration-300 focus-within:bg-white focus-within:shadow-md
+                        hover:bg-white/70 overflow-hidden
+                        ${error ? 'border-error/50 bg-error/5' : ''}`}
+            style={{ borderColor: error ? undefined : 'var(--border)' }}
           >
-            <CalendarDays
-              size={20}
-              className="absolute left-5 text-[#A49F96] pointer-events-none"
-              aria-hidden="true"
+            <CalendarDays 
+              size={18} 
+              strokeWidth={2} 
+              className="absolute left-5 text-muted-foreground transition-colors pointer-events-none" 
             />
-            <label htmlFor="cycleStartDate" className="sr-only">
-              Cycle start date
-            </label>
+            
+            {/* The visually perfect date text */}
+            <span className="text-[17px] font-semibold text-primary pointer-events-none tracking-wide">
+              {format(value, 'MMMM d, yyyy')}
+            </span>
+            
+            {/* The invisible native date picker that intercepts clicks */}
             <input
               id="cycleStartDate"
               type="date"
               value={inputValue}
               onChange={handleChange}
-              className="w-full h-[60px] bg-transparent pl-12 pr-5
-                         text-[18px] font-semibold text-foreground
-                         outline-none cursor-pointer"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
           </div>
 
-          {/* Live cycle preview — uses calculateCycleEndDate from onboarding.service.ts */}
+          {/* Live cycle preview */}
           <div
-            className="rounded-[20px] bg-background
-                       shadow-neu-card
-                       px-5 py-4 flex flex-col gap-1"
+            className="rounded-2xl bg-white/40 border
+                       px-5 py-4 flex flex-col gap-1 items-center justify-center mt-2 shadow-sm"
+            style={{ borderColor: 'var(--border)' }}
           >
-            <p className="text-[12px] font-bold text-[#A49F96] uppercase tracking-wider">
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-80">
               Your cycle will run
             </p>
-            <p className="text-[22px] font-black text-foreground tracking-tight">
+            <p className="text-xl font-bold text-primary tracking-tight mt-1">
               {startLabel}{' '}
-              <span className="text-[#A9BDD0]">→</span>{' '}
+              <span className="text-accent mx-2">&rarr;</span>{' '}
               {endLabel}
             </p>
           </div>
 
           {error && (
-            <p role="alert" className="text-[14px] text-error font-semibold pl-2">
+            <p role="alert" className="text-[13px] text-error font-medium mt-1">
               {error}
             </p>
           )}

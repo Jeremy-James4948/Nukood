@@ -15,6 +15,11 @@ const DEV_USERS: Record<string, AuthUser & { password: string }> = {
     userId: 'dev_james',
     username: 'james',
     password: 'james123'
+  },
+  'variath': {
+    userId: 'dev_variath',
+    username: 'variath',
+    password: 'variath123'
   }
 };
 

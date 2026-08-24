@@ -37,22 +37,22 @@ export const CarryForwardSlide: React.FC<CarryForwardSlideProps> = ({
       primaryLabel="Continue"
       onPrimary={onNext}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 items-center text-center w-full max-w-sm mx-auto mt-4">
         {/* Question */}
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-bold text-[#A49F96] uppercase tracking-widest">
+        <div className="flex flex-col gap-3 items-center">
+          <p className="text-[13px] font-bold text-accent uppercase tracking-[0.2em]">
             Unused budget
           </p>
-          <h2 className="text-[28px] font-black text-foreground leading-snug tracking-tight">
-            Would you like unused budget to carry into your next cycle?
+          <h2 className="text-3xl font-semibold text-primary leading-snug tracking-wide" style={{ fontFamily: '"Playfair Display", serif' }}>
+            Carry forward unused budget?
           </h2>
-          <p className="text-[15px] text-foreground font-medium leading-relaxed">
-            You can change this any time in settings.
+          <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[280px]">
+            Any money left over rolls into the next cycle. You can change this later.
           </p>
         </div>
 
         {/* Options */}
-        <div className="flex flex-col gap-3" role="radiogroup" aria-label="Carry forward preference">
+        <div className="flex flex-col gap-4 w-full" role="radiogroup" aria-label="Carry forward preference">
           {options.map(opt => {
             const isSelected = value === opt.value;
             return (
@@ -62,35 +62,41 @@ export const CarryForwardSlide: React.FC<CarryForwardSlideProps> = ({
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => onChange(opt.value)}
-                className={`relative w-full rounded-[24px] px-6 py-5 text-left transition-all
-                            flex items-center justify-between gap-4
+                className={`relative w-full rounded-2xl px-6 py-5 text-left transition-all duration-300
+                            flex items-center justify-between gap-4 border
                             ${isSelected
-                              ? 'shadow-neu-strong bg-background'
-                              : 'shadow-neu-card bg-background hover:shadow-neu-card'
+                              ? 'bg-white shadow-md border-primary/20'
+                              : 'bg-white/40 border-[var(--border)] hover:bg-white/70'
                             }`}
               >
                 <div className="flex flex-col gap-1">
                   <span
-                    className={`text-[17px] font-bold transition-colors ${
-                      isSelected ? 'text-foreground' : 'text-foreground'
+                    className={`text-[17px] font-semibold transition-colors ${
+                      isSelected ? 'text-primary' : 'text-foreground'
                     }`}
                   >
                     {opt.label}
                   </span>
-                  <span className="text-[13px] font-medium text-[#A49F96]">
+                  <span className="text-[13px] font-medium text-muted-foreground">
                     {opt.sub}
                   </span>
                 </div>
 
                 {/* Check indicator */}
                 <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all border ${
                     isSelected
-                      ? 'bg-primary'
-                      : 'bg-background shadow-neu-card'
+                      ? 'bg-primary border-primary'
+                      : 'bg-transparent border-[var(--border)]'
                   }`}
                 >
-                  {isSelected && <Check size={14} className="text-white" strokeWidth={3} />}
+                  <motion.div
+                    initial={false}
+                    animate={{ scale: isSelected ? 1 : 0, opacity: isSelected ? 1 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Check size={14} className="text-white" strokeWidth={3} />
+                  </motion.div>
                 </div>
               </motion.button>
             );

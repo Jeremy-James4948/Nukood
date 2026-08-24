@@ -50,10 +50,9 @@ const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 createRoot(document.getElementById("root")!).render(
   <AuthProvider>
     <InitializationProvider>
-      <ThemeProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public route — login page */}
+      <BrowserRouter>
+        <Routes>
+          {/* Public route — login page */}
           <Route
             path="/login"
             element={
@@ -73,13 +72,16 @@ createRoot(document.getElementById("root")!).render(
 
             {/* Application routes — require fully initialized account */}
             <Route element={<InitializedRoute />}>
-              <Route path="/*" element={<App />} />
+              <Route path="/*" element={
+                <ThemeProvider>
+                  <App />
+                </ThemeProvider>
+              } />
             </Route>
 
           </Route>
         </Routes>
       </BrowserRouter>
-      </ThemeProvider>
     </InitializationProvider>
   </AuthProvider>
 );

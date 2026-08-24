@@ -79,29 +79,32 @@ export const SlideLayout: React.FC<SlideLayoutProps> = ({
               onClick={onPrimary}
               disabled={primaryDisabled || primaryLoading}
               aria-label={primaryLabel}
-              className={`w-full h-[60px] rounded-[24px] bg-primary text-white text-[17px] font-bold
-                          flex items-center justify-center gap-2 transition-all
-                          shadow-[0_8px_16px_rgba(53,92,125,0.3)]
-                          disabled:opacity-40 disabled:cursor-not-allowed`}
+              className={`group relative w-full h-[60px] rounded-2xl bg-primary text-white text-[15px] tracking-widest font-bold
+                          flex items-center justify-center gap-2 transition-transform hover:-translate-y-0.5 overflow-hidden
+                          shadow-lg
+                          disabled:opacity-60 disabled:hover:translate-y-0 disabled:cursor-not-allowed`}
             >
-              {primaryLoading ? (
-                <>
-                  <svg
-                    className="animate-spin"
-                    width="20" height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                    aria-hidden="true"
-                  >
-                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                  </svg>
-                  Setting things up…
-                </>
-              ) : (
-                primaryLabel
-              )}
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative z-10 flex items-center gap-2">
+                {primaryLoading ? (
+                  <>
+                    <svg
+                      className="animate-spin"
+                      width="20" height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                    >
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                    Setting things up…
+                  </>
+                ) : (
+                  primaryLabel.toUpperCase()
+                )}
+              </span>
             </motion.button>
           )}
 
@@ -110,7 +113,7 @@ export const SlideLayout: React.FC<SlideLayoutProps> = ({
               whileTap={{ scale: 0.97 }}
               onClick={onSecondary}
               aria-label={secondaryLabel}
-              className="w-full h-[48px] rounded-[20px] text-[#A49F96] text-[15px] font-semibold
+              className="w-full h-[48px] rounded-[20px] text-muted-foreground text-[14px] font-semibold
                          flex items-center justify-center transition-colors hover:text-foreground"
             >
               {secondaryLabel}

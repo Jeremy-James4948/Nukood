@@ -95,6 +95,12 @@ function buildDefaultDraft(): OnboardingDraft {
 // ---------------------------------------------------------------------------
 
 export const OnboardingPage: React.FC = () => {
+  // Strip any global themes (dark mode, awesome mode) on mount so entry stays isolated
+  React.useEffect(() => {
+    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.classList.remove('dark', 'light', 'awesome');
+  }, []);
+
   const { user }            = useAuth();
   const { markAsOnboarded } = useInitialization();
   const shouldReduceMotion  = useReducedMotion();

@@ -62,43 +62,44 @@ export const ReviewSlide: React.FC<ReviewSlideProps> = ({
       secondaryLabel="Nahh, let's start over"
       onSecondary={onRestart}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 items-center text-center w-full max-w-sm mx-auto mt-4">
         {/* Heading */}
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-bold text-[#A49F96] uppercase tracking-widest">
+        <div className="flex flex-col gap-3 items-center">
+          <p className="text-[13px] font-bold text-accent uppercase tracking-[0.2em]">
             Looking good
           </p>
-          <h2 className="text-[28px] font-black text-foreground leading-snug tracking-tight">
+          <h2 className="text-3xl font-semibold text-primary leading-snug tracking-wide" style={{ fontFamily: '"Playfair Display", serif' }}>
             You're all set.
           </h2>
-          <p className="text-[15px] text-foreground font-medium leading-relaxed">
+          <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[280px]">
             Here's what we'll set up for you. Does everything look right?
           </p>
         </div>
 
         {/* Summary card */}
         <div
-          className="rounded-[28px] bg-background
-                     shadow-neu-card
-                     divide-y divide-[#E8E4DD] overflow-hidden"
+          className="rounded-3xl bg-white/40 border w-full
+                     overflow-hidden shadow-sm flex flex-col"
+          style={{ borderColor: 'var(--border)' }}
         >
-          {rows.map(({ icon, label, value }) => (
+          {rows.map(({ icon, label, value }, index) => (
             <div
               key={label}
-              className="flex items-center gap-4 px-6 py-4"
+              className={`flex items-center gap-4 px-6 py-5 ${
+                index !== rows.length - 1 ? 'border-b border-[var(--border)]' : ''
+              }`}
             >
               <div
-                className="w-8 h-8 rounded-full bg-background
-                           shadow-neu-card
-                           flex items-center justify-center shrink-0"
+                className="w-10 h-10 rounded-2xl bg-white/60 border border-[var(--border)]
+                           flex items-center justify-center shrink-0 text-primary"
               >
                 {icon}
               </div>
-              <div className="flex flex-col min-w-0">
-                <p className="text-[11px] font-bold text-[#A49F96] uppercase tracking-wider">
+              <div className="flex flex-col min-w-0 text-left">
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
                   {label}
                 </p>
-                <p className="text-[16px] font-bold text-foreground truncate">
+                <p className="text-[15px] font-semibold text-foreground truncate mt-0.5">
                   {value}
                 </p>
               </div>

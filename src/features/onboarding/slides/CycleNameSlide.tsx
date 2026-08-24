@@ -43,25 +43,32 @@ export const CycleNameSlide: React.FC<CycleNameSlideProps> = ({
       onPrimary={handleNext}
       primaryDisabled={touched && trimmed.length === 0}
     >
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 items-center text-center w-full max-w-sm mx-auto mt-4">
         {/* Question */}
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-bold text-[#A49F96] uppercase tracking-widest">
+        <div className="flex flex-col gap-3 items-center">
+          <p className="text-[13px] font-bold text-accent uppercase tracking-[0.2em]">
             Cycle name
           </p>
-          <h2 className="text-[28px] font-black text-foreground leading-snug tracking-tight">
-            What would you like to call this cycle?
+          <h2 className="text-3xl font-semibold text-primary leading-snug tracking-wide" style={{ fontFamily: '"Playfair Display", serif' }}>
+            What should we call this cycle?
           </h2>
-          <p className="text-[15px] text-foreground font-medium leading-relaxed">
+          <p className="text-[15px] text-muted-foreground font-medium leading-relaxed max-w-[280px]">
             Give it a name that makes sense to you.
           </p>
         </div>
 
         {/* Input */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 relative group w-full">
           <label htmlFor="cycleName" className="sr-only">
             Cycle name
           </label>
+          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none transition-colors group-focus-within:text-primary text-muted-foreground z-10 h-[60px]">
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+               <polyline points="7 10 12 15 17 10"></polyline>
+               <line x1="12" y1="15" x2="12" y2="3"></line>
+             </svg>
+          </div>
           <input
             id="cycleName"
             type="text"
@@ -72,29 +79,28 @@ export const CycleNameSlide: React.FC<CycleNameSlideProps> = ({
             autoFocus
             aria-invalid={isInvalid}
             aria-describedby={isInvalid ? 'cycleName-error' : undefined}
-            className={`w-full h-[60px] rounded-[20px] bg-background px-6
-                        text-[18px] font-semibold text-foreground placeholder-[#C9C4BC]
-                        outline-none transition-all
-                        shadow-neu-card
-                        focus:ring-2 focus:ring-[#355C7D]/20
-                        ${isInvalid ? 'ring-2 ring-red-300' : ''}`}
+            className={`w-full h-[60px] rounded-2xl bg-white/50 border px-12
+                       text-[16px] font-medium text-foreground placeholder:text-muted-foreground/60
+                       outline-none focus:bg-white focus:shadow-md transition-all duration-300 relative z-0 text-center
+                       ${isInvalid ? 'border-error/50 bg-error/5' : ''}`}
+            style={{ borderColor: isInvalid ? undefined : 'var(--border)' }}
           />
-          <div className="flex justify-between px-1">
+          <div className="flex justify-between px-2 mt-1">
             {isInvalid ? (
-              <p id="cycleName-error" role="alert" className="text-[13px] text-error font-semibold">
+              <p id="cycleName-error" role="alert" className="text-[12px] text-error font-medium">
                 Please enter a name for your cycle.
               </p>
             ) : (
               <span />
             )}
-            <p className="text-[12px] text-[#A49F96] font-medium ml-auto">
+            <p className="text-[12px] text-muted-foreground font-medium">
               {value.length}/{MAX_LENGTH}
             </p>
           </div>
         </div>
 
         {/* Suggestions */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-center gap-2 mt-2">
           {['August', 'September', 'Monthly', 'First Cycle'].map(suggestion => (
             <button
               key={suggestion}
@@ -103,10 +109,9 @@ export const CycleNameSlide: React.FC<CycleNameSlideProps> = ({
                 onChange(suggestion);
                 setTouched(false);
               }}
-              className="px-4 py-2 rounded-full text-[13px] font-semibold text-foreground
-                         bg-background shadow-neu-card
-                         hover:shadow-neu-card
-                         transition-all active:scale-95"
+              className="px-5 py-2.5 rounded-full text-[13px] font-semibold text-primary
+                         bg-white/40 border transition-all active:scale-95 hover:bg-white hover:shadow-sm"
+              style={{ borderColor: 'var(--border)' }}
             >
               {suggestion}
             </button>
