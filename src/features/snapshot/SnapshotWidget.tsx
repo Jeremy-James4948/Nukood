@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, MoreHorizontal, Wallet, PieChart } from 'lucide-react';
+import { ShoppingBag, MoreHorizontal, Wallet, PieChart, Edit2 } from 'lucide-react';
 import { CATEGORY_COLORS } from '../../constants';
 import { BudgetHealthDrawer } from './BudgetHealthDrawer';
+import { ActiveCycleEditorDrawer } from './ActiveCycleEditorDrawer';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { FinancialEngine } from '../../utils/FinancialEngine';
 import { Category } from '../../services/category.service';
@@ -13,6 +14,7 @@ export function SnapshotWidget() {
   const { formatAmount, formatNumber, currencySymbol } = useCurrencyFormatter();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isHealthOpen, setIsHealthOpen] = useState(false);
+  const [isCycleEditorOpen, setIsCycleEditorOpen] = useState(false);
   const { activeCycle, settings, categories: dbCategories, isLoading, transactions } = useFinancialEngine();
 
   useEffect(() => {
@@ -88,12 +90,30 @@ export function SnapshotWidget() {
   // Neumorphic classes
   const neuExtrude = "bg-background shadow-neu-extrude";
   const neuIndent = "bg-background shadow-neu-inset";
+  
+  const formatDateHeader = (d: Date) => {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
   return (
     <section className="relative w-full flex flex-col gap-10 pb-12 pt-4">
       
       {/* Top Section: Balance */}
       <div className="flex flex-col items-center relative mb-4">
+        
+        {/* Active Cycle Date Range Editor */}
+        <button 
+          onClick={() => setIsCycleEditorOpen(true)}
+          className="flex items-center gap-2 mb-8 group active:scale-95 transition-transform"
+        >
+          <div className="px-4 py-1.5 rounded-full bg-background shadow-neu-extrude border border-white/40 flex items-center gap-2 text-muted-foreground group-hover:text-foreground transition-colors">
+            <span className="text-[12px] font-bold tracking-wide">
+              {formatDateHeader(new Date(activeCycle.startDate))} <span className="opacity-50">→</span> {formatDateHeader(new Date(activeCycle.endDate))}
+            </span>
+            <Edit2 size={12} strokeWidth={2.5} className="opacity-50 group-hover:opacity-100" />
+          </div>
+        </button>
+
         <span className="text-[13px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4">Remaining Balance</span>
         <div className="flex items-start text-foreground">
           <span className="text-[36px] font-semibold mt-1 mr-2 text-muted-foreground">{currencySymbol}</span>
@@ -177,40 +197,45 @@ export function SnapshotWidget() {
               </filter>
             </defs>
             <g>
-              {categories.map((cat, i) => {
-                // Increased spacing and thickness to fill space
-                const r = 130 - (i * 28); 
-                const c = 2 * Math.PI * r;
-                const offset = c - (c * (cat.percent / 100));
-                
-                // Opacity dimming if a category is selected
-                const isActive = activeCategory === cat.name;
-                const isFaded = activeCategory && !isActive;
+              {categories.length === 0 ? (
+                // Empty State Placeholder Ring
+                <circle cx="150" cy="150" r={130} fill="none" stroke="currentColor" strokeWidth="18" className="text-muted/30" />
+              ) : (
+                categories.map((cat, i) => {
+                  // Increased spacing and thickness to fill space
+                  const r = 130 - (i * 28); 
+                  const c = 2 * Math.PI * r;
+                  const offset = c - (c * (cat.percent / 100));
+                  
+                  // Opacity dimming if a category is selected
+                  const isActive = activeCategory === cat.name;
+                  const isFaded = activeCategory && !isActive;
 
-                return (
-                  <g
-                    key={cat.name}
-                    onClick={() => setActiveCategory(isActive ? null : cat.name)}
-                    className="cursor-pointer transition-opacity duration-500 ease-out"
-                    style={{ opacity: isFaded ? 0.3 : 1 }}
-                  >
-                    {/* Ring Background Track (Super subtle) */}
-                    <circle cx="150" cy="150" r={r} fill="none" stroke={`${cat.color}20`} strokeWidth="18" strokeLinecap="round" />
+                  return (
+                    <g
+                      key={cat.name}
+                      onClick={() => setActiveCategory(isActive ? null : cat.name)}
+                      className="cursor-pointer transition-opacity duration-500 ease-out"
+                      style={{ opacity: isFaded ? 0.3 : 1 }}
+                    >
+                      {/* Ring Background Track (Super subtle) */}
+                      <circle cx="150" cy="150" r={r} fill="none" stroke={`${cat.color}20`} strokeWidth="18" strokeLinecap="round" />
 
-                    {/* Animated Progress Ring */}
-                    <motion.circle
-                      initial={{ strokeDashoffset: c }}
-                      animate={{ strokeDashoffset: offset }}
-                      transition={{ duration: 1.8, delay: 0.1 + (i * 0.15), ease: [0.16, 1, 0.3, 1] }}
-                      cx="150" cy="150" r={r} fill="none" stroke={cat.color} strokeWidth="18"
-                      strokeDasharray={c} strokeLinecap="round" filter="url(#ring-shadow)"
-                    />
+                      {/* Animated Progress Ring */}
+                      <motion.circle
+                        initial={{ strokeDashoffset: c }}
+                        animate={{ strokeDashoffset: offset }}
+                        transition={{ duration: 1.8, delay: 0.1 + (i * 0.15), ease: [0.16, 1, 0.3, 1] }}
+                        cx="150" cy="150" r={r} fill="none" stroke={cat.color} strokeWidth="18"
+                        strokeDasharray={c} strokeLinecap="round" filter="url(#ring-shadow)"
+                      />
 
-                    {/* Invisible Hit Area for Reliable Taps */}
-                    <circle cx="150" cy="150" r={r} fill="none" stroke="transparent" strokeWidth="28" />
-                  </g>
-                );
-              })}
+                      {/* Invisible Hit Area for Reliable Taps */}
+                      <circle cx="150" cy="150" r={r} fill="none" stroke="transparent" strokeWidth="28" />
+                    </g>
+                  );
+                })
+              )}
             </g>
           </svg>
         </div>
@@ -241,6 +266,7 @@ export function SnapshotWidget() {
       </div>
 
       <BudgetHealthDrawer isOpen={isHealthOpen} onClose={() => setIsHealthOpen(false)} stats={budgetStats} />
+      <ActiveCycleEditorDrawer isOpen={isCycleEditorOpen} onClose={() => setIsCycleEditorOpen(false)} />
     </section>
   );
 }

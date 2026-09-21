@@ -80,6 +80,11 @@ export function ArchiveView() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
 
+  const [isEditingDates, setIsEditingDates] = useState(false);
+  const [editStartValue, setEditStartValue] = useState('');
+  const [editEndValue, setEditEndValue] = useState('');
+  const [showDateConfirm, setShowDateConfirm] = useState(false);
+
   // Fetch cycles on mount
   useEffect(() => {
     async function loadCycles() {
@@ -112,6 +117,12 @@ export function ArchiveView() {
     }
     loadJournals();
   }, [userId, currentCycleIndex, completedCycles]);
+
+  // Reset edit state when navigating between cycles
+  useEffect(() => {
+    setIsEditingDates(false);
+    setShowDateConfirm(false);
+  }, [currentCycleIndex]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full">Loading...</div>;
@@ -162,6 +173,10 @@ export function ArchiveView() {
 
   const cycleStartFormatted = formatDateHeader(cycle.startDate);
   const cycleEndFormatted = formatDateHeader(cycle.endDate);
+
+  // Format Date → "YYYY-MM-DD" for <input type="date">
+  const formatDateForInput = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const handleToggleDate = (fullDate: string) => {
     setSelectedDates(prev =>
@@ -271,9 +286,91 @@ export function ArchiveView() {
                 </button>
               </div>
             )}
-            <span className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-widest">
-              {cycleStartFormatted} <span className="mx-1.5 font-normal opacity-50">→</span> {cycleEndFormatted}
-            </span>
+            {/* Date Range — editable */}
+            {isEditingDates ? (
+              <div className="flex flex-col items-center gap-2 mt-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={editStartValue}
+                    onChange={e => setEditStartValue(e.target.value)}
+                    className="text-xs font-bold text-foreground bg-transparent border-b border-primary focus:outline-none text-center"
+                  />
+                  <span className="text-muted-foreground/50 font-normal text-xs">→</span>
+                  <input
+                    type="date"
+                    value={editEndValue}
+                    onChange={e => setEditEndValue(e.target.value)}
+                    className="text-xs font-bold text-foreground bg-transparent border-b border-primary focus:outline-none text-center"
+                  />
+                </div>
+                {showDateConfirm ? (
+                  <div className="flex flex-col items-center gap-2 mt-1">
+                    <p className="text-[10px] text-muted-foreground text-center max-w-[220px]">
+                      Update <strong>{cycle.cycleName}</strong> to {formatDateHeader(new Date(editStartValue))} → {formatDateHeader(new Date(editEndValue))}? This cannot be undone.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setIsLoading(true); // Rebalance might take a couple seconds
+                          await FinancialCycleService.rebalanceCyclesAfterDateChange(userId, cycle.cycleId, new Date(editStartValue), new Date(editEndValue));
+                          // Fetch everything fresh since totals and carry-forwards changed
+                          const cycles = await FinancialCycleService.getAllCycles(userId);
+                          setCompletedCycles(cycles);
+                          setIsEditingDates(false);
+                          setShowDateConfirm(false);
+                          setIsLoading(false);
+                        }}
+                        className="px-3 py-1 bg-primary text-white text-[11px] font-bold rounded-full"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => { setShowDateConfirm(false); setIsEditingDates(false); }}
+                        className="px-3 py-1 bg-muted text-muted-foreground text-[11px] font-bold rounded-full"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (editStartValue && editEndValue && new Date(editStartValue) <= new Date(editEndValue)) {
+                          setShowDateConfirm(true);
+                        }
+                      }}
+                      className="px-3 py-1 bg-primary text-white text-[11px] font-bold rounded-full"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditingDates(false)}
+                      className="px-3 py-1 bg-muted text-muted-foreground text-[11px] font-bold rounded-full"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-widest">
+                  {cycleStartFormatted} <span className="mx-1.5 font-normal opacity-50">→</span> {cycleEndFormatted}
+                </span>
+                <button
+                  onClick={() => {
+                    setEditStartValue(formatDateForInput(cycle.startDate));
+                    setEditEndValue(formatDateForInput(cycle.endDate));
+                    setIsEditingDates(true);
+                  }}
+                  className="text-muted-foreground/40 hover:text-foreground transition-colors"
+                >
+                  <Edit2 size={11} />
+                </button>
+              </div>
+            )}
           </div>
 
           <button 

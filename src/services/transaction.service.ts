@@ -239,6 +239,24 @@ export class TransactionService {
     delete safeUpdates.cycleId;
     delete safeUpdates.createdAt;
 
+    // Detect date change and compute the new journalId BEFORE converting to Timestamp.
+    // This must happen early so we can (a) patch journalId on the transaction doc atomically
+    // and (b) know which journals to update in the type-specific blocks below.
+    let newJournalId = oldTransaction.journalId;
+    let dateChanged = false;
+    if (updates.date instanceof Date) {
+      const nd = updates.date;
+      const ny = nd.getFullYear();
+      const nm = String(nd.getMonth() + 1).padStart(2, '0');
+      const ndy = String(nd.getDate()).padStart(2, '0');
+      newJournalId = `journal_${ny}_${nm}_${ndy}`;
+      dateChanged = newJournalId !== (oldTransaction.journalId ?? '');
+      if (dateChanged) {
+        // Keep the transaction document's journalId in sync with its new date.
+        safeUpdates.journalId = newJournalId;
+      }
+    }
+
     if (safeUpdates.date && safeUpdates.date instanceof Date) {
        safeUpdates.date = Timestamp.fromDate(safeUpdates.date);
     }
@@ -265,9 +283,8 @@ export class TransactionService {
 
     batch.update(txRef, safeUpdates);
 
-    // We only need to adjust totals if amount or categoryId changed.
-    // We assume transactionType doesn't change for an existing transaction (it's either an expense or income).
-    // Also assuming date doesn't change drastically across cycles for now.
+    // Adjust totals for amount, category, and/or date changes.
+    // transactionType is immutable — an expense cannot become income and vice versa.
     
     if (oldTransaction.transactionType === 'EXPENSE') {
       const newAmount = updates.amount !== undefined ? updates.amount : oldTransaction.amount;
@@ -297,8 +314,44 @@ export class TransactionService {
       
       batch.update(cycleRef, cycleUpdates);
 
-      // Adjust Journal if amount or category changed (assuming same journalId)
-      if ((amountDiff !== 0 || categoryChanged) && oldTransaction.journalId) {
+      // Handle journal updates: covers date change (move between journals), amount change, and category change.
+      if (dateChanged && oldTransaction.journalId) {
+        // Transaction moved to a different calendar day.
+        // Step 1: Remove it from the old journal.
+        const oldJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
+        const oldJournalUpdates: any = {
+          totalSpent: increment(-oldAmount),
+          transactionCount: increment(-1),
+        };
+        if (oldTransaction.categoryId) {
+          oldJournalUpdates[`categorySummary.${oldTransaction.categoryId}.totalSpent`] = increment(-oldAmount);
+          oldJournalUpdates[`categorySummary.${oldTransaction.categoryId}.transactionCount`] = increment(-1);
+        }
+        batch.update(oldJournalRef, oldJournalUpdates);
+
+        // Step 2: Add it to the new journal (creates the document if it doesn't exist yet).
+        const newDate = updates.date as Date;
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const newJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', newJournalId);
+        const newJournalData: any = {
+          journalId: newJournalId,
+          cycleId,
+          date: Timestamp.fromDate(new Date(`${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}T00:00:00`)),
+          dayName: days[newDate.getDay()],
+          dayNumber: newDate.getDate(),
+          totalSpent: increment(newAmount),
+          transactionCount: increment(1),
+          createdAt: now,
+        };
+        if (newCategory) {
+          newJournalData[`categorySummary.${newCategory}.totalSpent`] = increment(newAmount);
+          newJournalData[`categorySummary.${newCategory}.transactionCount`] = increment(1);
+          newJournalData[`categorySummary.${newCategory}.lastTransactionAt`] = now;
+        }
+        batch.set(newJournalRef, newJournalData, { merge: true });
+
+      } else if ((amountDiff !== 0 || categoryChanged) && oldTransaction.journalId) {
+        // Same day — patch amounts and/or category on the existing journal.
         const journalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
         const journalUpdates: any = {};
         
@@ -331,6 +384,27 @@ export class TransactionService {
           'budgetSnapshot.availableBalance': increment(amountDiff),
           updatedAt: now
         });
+      }
+
+      // Move transactionCount between journals if the date changed.
+      // Income doesn't affect totalSpent, but it does contribute to the day's transactionCount.
+      if (dateChanged && oldTransaction.journalId) {
+        const oldJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
+        batch.update(oldJournalRef, { transactionCount: increment(-1) });
+
+        const newDate = updates.date as Date;
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const newJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', newJournalId);
+        batch.set(newJournalRef, {
+          journalId: newJournalId,
+          cycleId,
+          date: Timestamp.fromDate(new Date(`${newDate.getFullYear()}-${String(newDate.getMonth() + 1).padStart(2, '0')}-${String(newDate.getDate()).padStart(2, '0')}T00:00:00`)),
+          dayName: days[newDate.getDay()],
+          dayNumber: newDate.getDate(),
+          totalSpent: increment(0),
+          transactionCount: increment(1),
+          createdAt: now,
+        }, { merge: true });
       }
     }
 

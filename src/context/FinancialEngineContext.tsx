@@ -117,8 +117,25 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
         // 2. Fetch or Initialize Active Cycle
         let cycle = await FinancialCycleService.getActiveCycle(userId);
-        if (!cycle) {
-          cycle = await FinancialCycleService.createNewCycle(userId, currentSettings, "Current Cycle");
+
+        // Auto-close: if today is past the active cycle's end date, it's over.
+        // Mark it COMPLETED so carry-forward picks it up, then create the new cycle.
+        // We use a WHILE loop to fast-forward through multiple missed cycles.
+        let isExpired = cycle && new Date() > cycle.endDate;
+        let lastClosedCycle = cycle;
+
+        while (isExpired || !cycle) {
+          if (cycle) {
+            console.log(`[FinancialEngine] Cycle "${cycle.cycleName}" has expired. Closing and creating new cycle.`);
+            await FinancialCycleService.completeCycle(userId, cycle.cycleId);
+            lastClosedCycle = cycle;
+            cycle = null;
+          }
+
+          const cycleName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          cycle = await FinancialCycleService.createNewCycle(userId, currentSettings, cycleName, lastClosedCycle);
+          
+          isExpired = cycle && new Date() > cycle.endDate;
         }
 
         if (!mounted) return;

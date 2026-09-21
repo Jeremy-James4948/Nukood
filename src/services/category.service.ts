@@ -31,39 +31,53 @@ export class CategoryService {
    * Retrieves all global categories.
    */
   static async getAllCategories(): Promise<Category[]> {
-    const categoriesRef = collection(db, 'categories');
-    const snap = await getDocs(categoriesRef);
+    try {
+      const categoriesRef = collection(db, 'categories');
+      const snap = await getDocs(categoriesRef);
 
-    if (snap.empty) {
-      return [];
+      if (snap.empty) {
+        return GLOBAL_CATEGORIES.map(c => ({ ...c, createdAt: new Date(), updatedAt: new Date() })) as Category[];
+      }
+
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+          updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+        } as Category;
+      });
+    } catch (e) {
+      console.warn("Failed to fetch global categories from Firestore (possibly missing permissions). Falling back to defaults.", e);
+      return GLOBAL_CATEGORIES.map(c => ({ ...c, createdAt: new Date(), updatedAt: new Date() })) as Category[];
     }
-
-    return snap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
-        updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
-      } as Category;
-    });
   }
 
   /**
    * Retrieves all active global categories (used for rendering UI options).
    */
   static async getActiveCategories(): Promise<Category[]> {
-    const categoriesRef = collection(db, 'categories');
-    const q = query(categoriesRef, where('isActive', '==', true));
-    const snap = await getDocs(q);
+    try {
+      const categoriesRef = collection(db, 'categories');
+      const q = query(categoriesRef, where('isActive', '==', true));
+      const snap = await getDocs(q);
 
-    return snap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
-        updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
-      } as Category;
-    });
+      if (snap.empty) {
+        return GLOBAL_CATEGORIES.filter(c => c.isActive).map(c => ({ ...c, createdAt: new Date(), updatedAt: new Date() })) as Category[];
+      }
+
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+          updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+        } as Category;
+      });
+    } catch (e) {
+      console.warn("Failed to fetch active global categories from Firestore (possibly missing permissions). Falling back to defaults.", e);
+      return GLOBAL_CATEGORIES.filter(c => c.isActive).map(c => ({ ...c, createdAt: new Date(), updatedAt: new Date() })) as Category[];
+    }
   }
 
   /**

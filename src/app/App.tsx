@@ -4,6 +4,7 @@ import { FloatingUtilities } from '../components/layout/FloatingUtilities';
 import { HistoryView } from '../features/history/HistoryView';
 import { ArchiveView } from '../features/archive/ArchiveView';
 import { DailyCardCarousel } from '../features/dashboard/DailyCardCarousel';
+import { CycleEndingBanner } from '../features/dashboard/CycleEndingBanner';
 import { SnapshotWidget } from '../features/snapshot/SnapshotWidget';
 import { FinancialEngineProvider } from '../context/FinancialEngineContext';
 import { TemplateService } from '../services/template.service';
@@ -38,6 +39,7 @@ export default function App() {
             {activeTab === 'History' && <HistoryView />}
             {activeTab === 'Journal' && (
               <>
+                <CycleEndingBanner />
                 <DailyCardCarousel />
                 <div className="px-6 pb-12">
                   <SnapshotWidget />

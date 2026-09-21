@@ -7,39 +7,53 @@ export class TemplateService {
    * Retrieves all global templates.
    */
   static async getAllTemplates(): Promise<TransactionTemplate[]> {
-    const templatesRef = collection(db, 'templates');
-    const snap = await getDocs(templatesRef);
+    try {
+      const templatesRef = collection(db, 'templates');
+      const snap = await getDocs(templatesRef);
 
-    if (snap.empty) {
-      return [];
+      if (snap.empty) {
+        return Object.values(GLOBAL_TEMPLATES).map(t => ({ ...t, createdAt: new Date(), updatedAt: new Date() })) as TransactionTemplate[];
+      }
+
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+          updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+        } as TransactionTemplate;
+      });
+    } catch (e) {
+      console.warn("Failed to fetch global templates from Firestore. Falling back to defaults.", e);
+      return Object.values(GLOBAL_TEMPLATES).map(t => ({ ...t, createdAt: new Date(), updatedAt: new Date() })) as TransactionTemplate[];
     }
-
-    return snap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
-        updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
-      } as TransactionTemplate;
-    });
   }
 
   /**
    * Retrieves all active global templates.
    */
   static async getActiveTemplates(): Promise<TransactionTemplate[]> {
-    const templatesRef = collection(db, 'templates');
-    const q = query(templatesRef, where('isActive', '==', true));
-    const snap = await getDocs(q);
+    try {
+      const templatesRef = collection(db, 'templates');
+      const q = query(templatesRef, where('isActive', '==', true));
+      const snap = await getDocs(q);
 
-    return snap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
-        updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
-      } as TransactionTemplate;
-    });
+      if (snap.empty) {
+        return Object.values(GLOBAL_TEMPLATES).filter(t => t.isActive).map(t => ({ ...t, createdAt: new Date(), updatedAt: new Date() })) as TransactionTemplate[];
+      }
+
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          createdAt: typeof data.createdAt?.toDate === 'function' ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+          updatedAt: typeof data.updatedAt?.toDate === 'function' ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+        } as TransactionTemplate;
+      });
+    } catch (e) {
+      console.warn("Failed to fetch active templates from Firestore. Falling back to defaults.", e);
+      return Object.values(GLOBAL_TEMPLATES).filter(t => t.isActive).map(t => ({ ...t, createdAt: new Date(), updatedAt: new Date() })) as TransactionTemplate[];
+    }
   }
 
   /**

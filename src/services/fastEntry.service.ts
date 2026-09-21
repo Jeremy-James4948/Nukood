@@ -17,20 +17,25 @@ export class FastEntryService {
    * Fetches all Fast Entries for the given user, ordered by most recently used or created.
    */
   static async getFastEntries(userId: string): Promise<FastEntry[]> {
-    const fastEntriesRef = collection(db, 'users', userId, 'fastEntries');
-    // For MVP, just order by usageCount or createdAt
-    const q = query(fastEntriesRef, orderBy('usageCount', 'desc'));
-    const snap = await getDocs(q);
+    try {
+      const fastEntriesRef = collection(db, 'users', userId, 'fastEntries');
+      // For MVP, just order by usageCount or createdAt
+      const q = query(fastEntriesRef, orderBy('usageCount', 'desc'));
+      const snap = await getDocs(q);
 
-    return snap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        lastUsedAt: data.lastUsedAt?.toDate(),
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
-      } as FastEntry;
-    });
+      return snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          lastUsedAt: data.lastUsedAt?.toDate(),
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+        } as FastEntry;
+      });
+    } catch (e) {
+      console.warn("Failed to fetch fast entries from Firestore (possibly missing permissions or index). Falling back to empty array.", e);
+      return [];
+    }
   }
 
   /**

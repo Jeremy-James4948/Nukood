@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { FinancialSettingsService } from '../../services/financialSettings.service';
+import { FinancialCycleService } from '../../services/financialCycle.service';
 import { EditModal } from '../../components/ui/EditModal';
 import { ManageCategoriesDrawer } from './ManageCategoriesDrawer';
 import { ManageFastEntriesDrawer } from './ManageFastEntriesDrawer';
@@ -32,7 +33,7 @@ interface SettingsDrawerProps {
 }
 
 export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
-  const { settings, userId, refreshSettings } = useFinancialEngine();
+  const { settings, userId, refreshSettings, activeCycle, refreshCycle, transactions, refreshTransactions } = useFinancialEngine();
   const { signOut, user } = useAuth();
   const [editingConfig, setEditingConfig] = useState<{ key: string, title: string, type: 'text'|'number'|'toggle'|'date'|'select', value: any, description?: string, options?: { label: string; value: any; description?: string }[] } | null>(null);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
@@ -55,34 +56,55 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     if (!editingConfig || !settings) return;
     try {
       const updates: any = {};
-      
+
       if (editingConfig.key === 'cycleConfiguration.startDate') {
         const newStartDate = new Date(val);
         updates['cycleConfiguration'] = {
           ...settings.cycleConfiguration,
           startDate: newStartDate
         };
+
+        // Gap-fill: if the new start date is more than one day after the active cycle ends,
+        // auto-extend the active cycle's end date to (newStart - 1 day) so no days are orphaned.
+        if (activeCycle) {
+          const newStart = new Date(newStartDate);
+          newStart.setHours(0, 0, 0, 0);
+          const dayAfterActive = new Date(activeCycle.endDate.getTime() + 24 * 60 * 60 * 1000);
+          dayAfterActive.setHours(0, 0, 0, 0);
+
+          if (newStart > dayAfterActive) {
+            // Gap detected — stretch the current cycle to cover it.
+            const gapFilledEnd = new Date(newStartDate);
+            gapFilledEnd.setDate(gapFilledEnd.getDate() - 1);
+            await FinancialCycleService.updateCycleEndDate(userId, activeCycle.cycleId, gapFilledEnd);
+            await refreshCycle();
+          }
+        }
+
       } else if (editingConfig.key === 'cycleConfiguration.endDate') {
         const newEndDate = new Date(val);
-        const start = new Date(settings.cycleConfiguration.startDate);
-        
-        start.setHours(0, 0, 0, 0);
-        newEndDate.setHours(0, 0, 0, 0);
 
-        let diffTime = newEndDate.getTime() - start.getTime();
-        let lengthDays = Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        // This drawer is for PLANNING the upcoming cycle. 
+        // We do NOT modify the active cycle here. We just calculate 
+        // the desired length from the settings startDate to this newEndDate.
+        const cycleStart = new Date(settings.cycleConfiguration.startDate);
+        cycleStart.setHours(0, 0, 0, 0);
+        const endDay = new Date(newEndDate);
+        endDay.setHours(0, 0, 0, 0);
         
-        if (lengthDays < 1) lengthDays = 1;
+        const diffTime = endDay.getTime() - cycleStart.getTime();
+        const lengthDays = Math.max(1, Math.round(diffTime / (1000 * 60 * 60 * 24)) + 1);
 
         updates['cycleConfiguration'] = {
           ...settings.cycleConfiguration,
           cycleLengthDays: lengthDays
         };
+
       } else if (editingConfig.key === 'budgetThresholds') {
         let comfortable = 90;
         let onTrack = 105;
         let tight = 115;
-        
+
         if (val === 'strict') {
           comfortable = 80;
           onTrack = 95;
@@ -134,7 +156,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
       ]
     },
     {
-      title: 'Monthly Cycle',
+      title: 'Upcoming Cycle Configuration',
       items: [
         { 
           icon: Calendar, 
