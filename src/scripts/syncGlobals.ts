@@ -1,8 +1,3 @@
-import { config } from 'dotenv';
-import { resolve } from 'path';
-// Load environment variables for the Node.js script
-config({ path: resolve(__dirname, '../../.env.local') });
-
 import { CategoryService } from '../services/category.service';
 import { TemplateService } from '../services/template.service';
 

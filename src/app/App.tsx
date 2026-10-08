@@ -3,6 +3,7 @@ import { FloatingNavigation } from '../components/layout/FloatingNavigation';
 import { FloatingUtilities } from '../components/layout/FloatingUtilities';
 import { HistoryView } from '../features/history/HistoryView';
 import { ArchiveView } from '../features/archive/ArchiveView';
+import { SplitExpensesView } from '../features/splits/SplitExpensesView';
 import { DailyCardCarousel } from '../features/dashboard/DailyCardCarousel';
 import { CycleEndingBanner } from '../features/dashboard/CycleEndingBanner';
 import { SnapshotWidget } from '../features/snapshot/SnapshotWidget';
@@ -46,6 +47,7 @@ export default function App() {
                 </div>
               </>
             )}
+            {activeTab === 'Splits' && <SplitExpensesView />}
             {activeTab === 'Archive' && <ArchiveView />}
           </main>
         </div>

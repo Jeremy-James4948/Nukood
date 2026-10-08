@@ -1,6 +1,7 @@
 import { AuthProvider, AuthUser } from '../../types/auth';
+import { FinancialSettingsService } from '../financialSettings.service';
 
-const DEV_USERS: Record<string, AuthUser & { password: string }> = {
+export const DEV_USERS: Record<string, AuthUser & { password: string }> = {
   'JJ': {
     userId: 'dev_jj',
     username: 'JJ',
@@ -20,6 +21,11 @@ const DEV_USERS: Record<string, AuthUser & { password: string }> = {
     userId: 'dev_variath',
     username: 'variath',
     password: 'variath123'
+  },
+  'demo-user-1': {
+    userId: 'demo-user-1',
+    username: 'demo',
+    password: 'demo123'
   }
 };
 
@@ -57,9 +63,20 @@ export class DevelopmentAuthProvider implements AuthProvider {
       throw new Error('Invalid username or password.');
     }
 
+    // Fetch actual name from live database, fallback to hardcoded if not found
+    let realName = userEntry.username;
+    try {
+      const settings = await FinancialSettingsService.getSettings(userEntry.userId);
+      if (settings && settings.profileName) {
+        realName = settings.profileName;
+      }
+    } catch (e) {
+      console.warn("Could not fetch real profile name, using fallback.", e);
+    }
+
     const authUser: AuthUser = {
       userId: userEntry.userId,
-      username: userEntry.username
+      username: realName
     };
 
     this.currentUser = authUser;

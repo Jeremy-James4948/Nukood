@@ -12,7 +12,7 @@ export function FloatingUtilities() {
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
-        className="absolute top-8 right-6 z-40 flex flex-col gap-4"
+        className="absolute top-20 right-6 z-40 flex flex-col gap-4"
       >
         <motion.button
           onClick={() => setIsProfileOpen(true)}

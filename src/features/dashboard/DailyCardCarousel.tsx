@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, Plus, X } from 'lucide-react';
+import { ShoppingBag, Plus, X, Camera } from 'lucide-react';
 import { AddTransactionDrawer } from '../transactions/AddTransactionDrawer';
 import { SettingsDrawer } from '../settings/SettingsDrawer';
 import { useCurrencyFormatter } from '../../utils/currency';
@@ -17,10 +17,19 @@ export function DailyCardCarousel() {
   const [isAddTxOpen, setIsAddTxOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fastEntryContext, setFastEntryContext] = useState<{name?: string, category: string, icon?: string, price?: string, quantity?: string, unit?: string, notes?: string} | null>(null);
+  const [scannedReceipt, setScannedReceipt] = useState<File | null>(null);
 
-  const handleOpenAddTx = (fastEntry: {name?: string, category: string, icon?: string, price?: string, quantity?: string, unit?: string, notes?: string} | null = null) => {
+  const handleOpenAddTx = (fastEntry: {name?: string, category: string, icon?: string, price?: string, quantity?: string, unit?: string, notes?: string} | null = null, receipt: File | null = null) => {
     setFastEntryContext(fastEntry);
+    setScannedReceipt(receipt);
     setIsAddTxOpen(true);
+  };
+
+  const handleScanReceipt = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleOpenAddTx(null, file);
+    }
   };
 
   const today = new Date();
@@ -246,12 +255,12 @@ export function DailyCardCarousel() {
 
                   {/* Bottom Action Buttons */}
                   {isToday && (
-                    <div className="flex justify-center items-center mt-3 px-1 w-full">
+                    <div className="flex justify-center items-center mt-3 px-1 w-full gap-3">
                       <motion.button 
                         whileHover={variants.hoverScale}
                         whileTap={variants.tapScale}
                         onClick={(e) => { e.stopPropagation(); handleOpenAddTx(); }}
-                        className={`w-full h-16 rounded-[20px] flex items-center justify-center gap-3 ${neuExtrude} text-foreground font-semibold tracking-wide`}
+                        className={`flex-1 h-16 rounded-[20px] flex items-center justify-center gap-3 ${neuExtrude} text-foreground font-semibold tracking-wide`}
                       >
                         <motion.div
                           animate={{ rotate: [0, 90, 0] }}
@@ -261,6 +270,16 @@ export function DailyCardCarousel() {
                         </motion.div>
                         Add Transaction
                       </motion.button>
+                      
+                      <motion.label 
+                        whileHover={variants.hoverScale}
+                        whileTap={variants.tapScale}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`w-16 h-16 shrink-0 rounded-[20px] flex items-center justify-center cursor-pointer ${neuExtrude} text-foreground`}
+                      >
+                         <Camera size={26} className="text-[#A9BDD0]" />
+                         <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanReceipt} />
+                      </motion.label>
                     </div>
                   )}
                 </div>
@@ -376,8 +395,9 @@ export function DailyCardCarousel() {
 
       <AddTransactionDrawer 
         isOpen={isAddTxOpen} 
-        onClose={() => setIsAddTxOpen(false)} 
+        onClose={() => { setIsAddTxOpen(false); setScannedReceipt(null); }} 
         initialContext={fastEntryContext} 
+        initialReceipt={scannedReceipt}
       />
       <SettingsDrawer 
         isOpen={isSettingsOpen} 

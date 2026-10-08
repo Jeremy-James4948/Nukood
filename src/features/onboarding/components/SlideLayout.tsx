@@ -1,7 +1,8 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { ChevronLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ChevronLeft, LogOut } from 'lucide-react';
 import { OnboardingProgress } from './OnboardingProgress';
+import { useAuth } from '../../../context/AuthContext';
 
 interface SlideLayoutProps {
   /** Which question step this slide is for (0-indexed, used for progress dots).
@@ -36,33 +37,57 @@ export const SlideLayout: React.FC<SlideLayoutProps> = ({
   onSecondary,
   children,
 }) => {
+  const { signOut } = useAuth();
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
     <div className="flex flex-col h-full">
 
       {/* ── Header bar ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 pt-8 pb-4 min-h-[64px]">
-        {showBack ? (
+      <div className="relative flex items-center justify-between px-6 pt-8 pb-4 min-h-[64px]">
+        <div className="flex-1 flex justify-start z-10">
+          {showBack && (
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={onBack}
+              aria-label="Go back"
+              className="w-10 h-10 rounded-full bg-background shadow-neu-card
+                         flex items-center justify-center text-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </motion.button>
+          )}
+        </div>
+
+        <div className="absolute left-1/2 -translate-x-1/2 z-0">
+          {step !== undefined && (
+            <OnboardingProgress currentStep={step} totalSteps={totalSteps} />
+          )}
+        </div>
+
+        <div className="flex-1 flex justify-end z-10">
           <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={onBack}
-            aria-label="Go back"
-            className="w-10 h-10 rounded-full bg-background shadow-neu-card
-                       flex items-center justify-center text-foreground hover:text-foreground transition-colors"
+            onHoverStart={() => setIsHovered(true)}
+            onHoverEnd={() => setIsHovered(false)}
+            onClick={() => signOut()}
+            layout
+            className="group h-11 rounded-full bg-background shadow-neu-card flex items-center text-muted-foreground hover:text-red-500 transition-colors px-3 overflow-hidden"
           >
-            <ChevronLeft size={20} />
+            <LogOut size={22} className="shrink-0" />
+            <AnimatePresence>
+              {isHovered && (
+                <motion.span
+                  initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+                  animate={{ width: 'auto', opacity: 1, marginLeft: 8 }}
+                  exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+                  className="text-[12px] font-bold whitespace-nowrap pr-2"
+                >
+                  Return to Login
+                </motion.span>
+              )}
+            </AnimatePresence>
           </motion.button>
-        ) : (
-          <div className="w-10" />
-        )}
-
-        {step !== undefined ? (
-          <OnboardingProgress currentStep={step} totalSteps={totalSteps} />
-        ) : (
-          <div />
-        )}
-
-        {/* spacer to balance the back button */}
-        <div className="w-10" />
+        </div>
       </div>
 
       {/* ── Slide content ──────────────────────────────────────── */}

@@ -18,6 +18,7 @@ export interface Transaction {
   fastEntryId?: string;
   source?: string;
   transactionDetails: Record<string, any>;
+  splitExpenseId?: string;
   createdAt: Date;
   updatedAt: Date;
 }

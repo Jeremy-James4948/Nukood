@@ -1,5 +1,6 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 
 interface WelcomeSlideProps {
@@ -7,10 +8,38 @@ interface WelcomeSlideProps {
 }
 
 export const WelcomeSlide: React.FC<WelcomeSlideProps> = ({ onBegin }) => {
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 gap-10 text-center py-8">
+    <div className="flex flex-col h-full relative">
+      
+      {/* ── Header bar ─────────────────────────────────────────── */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-end px-6 pt-8 pb-4 min-h-[64px] z-50">
+        <motion.button
+          onHoverStart={() => setIsHovered(true)}
+          onHoverEnd={() => setIsHovered(false)}
+          onClick={() => signOut()}
+          layout
+          className="group h-11 rounded-full bg-background shadow-neu-card flex items-center text-muted-foreground hover:text-red-500 transition-colors px-3 overflow-hidden"
+        >
+          <LogOut size={22} className="shrink-0" />
+          <AnimatePresence>
+            {isHovered && (
+              <motion.span
+                initial={{ width: 0, opacity: 0, marginLeft: 0 }}
+                animate={{ width: 'auto', opacity: 1, marginLeft: 8 }}
+                exit={{ width: 0, opacity: 0, marginLeft: 0 }}
+                className="text-[12px] font-bold whitespace-nowrap pr-2"
+              >
+                Return to Login
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </motion.button>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center px-6 gap-10 text-center py-8">
 
       {/* Brand mark */}
       <motion.div
@@ -65,13 +94,8 @@ export const WelcomeSlide: React.FC<WelcomeSlideProps> = ({ onBegin }) => {
           <span className="relative z-10">LET'S BEGIN</span>
         </motion.button>
 
-        <button 
-          onClick={logout}
-          className="mt-6 text-[13px] text-muted-foreground font-medium hover:text-primary transition-colors underline-offset-4 hover:underline"
-        >
-          Actually, I want to sign out
-        </button>
       </motion.div>
+    </div>
     </div>
   );
 };

@@ -16,13 +16,17 @@ import { Category } from '../../services/category.service';
 import { TransactionService, Transaction } from '../../services/transaction.service';
 import { FastEntryService, FastEntry } from '../../services/fastEntry.service';
 import { useCurrencyFormatter } from '../../utils/currency';
-
+import { SplitExpenseService, SplitMethod } from '../../services/splitExpense.service';
+import { DEV_USERS } from '../../services/auth/developmentAuthProvider';
+import { ReceiptService } from '../../services/receipt.service';
+import { toast } from 'sonner';
 interface AddTransactionDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   initialContext: { name?: string, category: string, icon?: string, price?: string, quantity?: string, unit?: string, notes?: string } | null;
   editTransaction?: Transaction | null;
   onSuccess?: () => void;
+  initialReceipt?: File | null;
 }
 
 export function AddTransactionDrawer({
@@ -30,7 +34,8 @@ export function AddTransactionDrawer({
   onClose,
   initialContext,
   editTransaction,
-  onSuccess
+  onSuccess,
+  initialReceipt
 }: AddTransactionDrawerProps) {
   const [step, setStep] = useState<'SELECT_CATEGORY' | 'FORM'>('SELECT_CATEGORY');
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
@@ -44,6 +49,13 @@ export function AddTransactionDrawer({
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveAsFastEntry, setSaveAsFastEntry] = useState(false);
+
+  // Split UI state
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>('EQUAL');
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [manualShares, setManualShares] = useState<Record<string, string>>({});
+
   
   const { settings, categories, templates, fastEntries, activeCycle, userId, refreshCycle, refreshTransactions, refreshFastEntries } = useFinancialEngine();
   const { currencySymbol } = useCurrencyFormatter();
@@ -93,14 +105,18 @@ export function AddTransactionDrawer({
         setTitle('');
         setAmount('');
         setNote('');
-        setReceiptFile(null);
+        setReceiptFile(initialReceipt || null);
         setDate(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
         setFormData({});
         setSaveAsFastEntry(false);
         setIsSaving(false);
+        setSplitEnabled(false);
+        setSplitMethod('EQUAL');
+        setSelectedParticipants(userId ? [userId] : []);
+        setManualShares({});
       }
     }
-  }, [isOpen, initialContext, editTransaction, categories]);
+  }, [isOpen, initialContext, editTransaction, categories, initialReceipt]);
 
   const handleSelectCategory = (cat: Category) => {
     setActiveCategory(cat);
@@ -163,6 +179,10 @@ export function AddTransactionDrawer({
       setAmount('');
       setSaveAsFastEntry(false);
       setIsSaving(false);
+      setSplitEnabled(false);
+      setSplitMethod('EQUAL');
+      setSelectedParticipants(userId ? [userId] : []);
+      setManualShares({});
     }, 300);
   };
 
@@ -177,7 +197,7 @@ export function AddTransactionDrawer({
           if (field.required) {
             const val = formData[field.fieldId];
             if (!val || String(val).trim() === '') {
-              alert(`Please fill out the required field: ${field.label}`);
+              toast.error(`Please fill out the required field: ${field.label}`);
               return;
             }
           }
@@ -196,7 +216,7 @@ export function AddTransactionDrawer({
       }
 
       if (isNaN(finalAmount) || finalAmount <= 0) {
-        alert("Please enter a valid amount or fill out quantity and price.");
+        toast.error("Please enter a valid amount or fill out quantity and price.");
         return;
       }
 
@@ -237,28 +257,75 @@ export function AddTransactionDrawer({
           receiptFile
         );
       } else {
-        await TransactionService.createTransaction(
-          userId,
-          activeCycle.cycleId,
-          {
+        if (splitEnabled) {
+          // Validate Split
+          if (selectedParticipants.length < 2) {
+            toast.error("Please select at least one other participant.");
+            setIsSaving(false);
+            return;
+          }
+          
+          let splitParticipants: { userId: string; shareAmount?: number }[] = [];
+          if (splitMethod === 'EQUAL') {
+            splitParticipants = selectedParticipants.map(uid => ({ userId: uid }));
+          } else {
+            let sum = 0;
+            for (const uid of selectedParticipants) {
+              const share = Number(manualShares[uid]) || 0;
+              sum += share;
+              splitParticipants.push({ userId: uid, shareAmount: share });
+            }
+            if (Math.abs(sum - finalAmount) > 0.001) {
+              toast.error("The split amounts must equal the total expense.");
+              setIsSaving(false);
+              return;
+            }
+          }
+
+          let finalReceiptUrl = receiptFile ? (receiptFile as any).url : undefined;
+          if (receiptFile && !finalReceiptUrl) {
+            // Upload receipt for split
+            const metadata = await ReceiptService.uploadReceipt(userId, 'split_' + Date.now(), 'global_receipt', receiptFile);
+            finalReceiptUrl = metadata.url;
+          }
+
+          await SplitExpenseService.createSplitExpense({
+            title: finalTitle,
+            totalAmount: finalAmount,
+            date: txDate,
             categoryId: activeCategory.categoryId,
             templateId: template?.templateId || 'none',
-            transactionType: isIncome ? 'INCOME' : 'EXPENSE',
-            title: finalTitle,
-            amount: finalAmount,
-            date: txDate,
-            note: note.trim() || undefined,
-            transactionDetails: formData
-          },
-          saveAsFastEntry,
-          receiptFile
-        );
+            transactionDetails: formData,
+            participants: splitParticipants,
+            splitMethod,
+            notes: note.trim() || undefined,
+            receiptUrl: finalReceiptUrl
+          });
+          toast.success("Expense split successfully!");
+        } else {
+          await TransactionService.createTransaction(
+            userId,
+            activeCycle.cycleId,
+            {
+              categoryId: activeCategory.categoryId,
+              templateId: template?.templateId || 'none',
+              transactionType: isIncome ? 'INCOME' : 'EXPENSE',
+              title: finalTitle,
+              amount: finalAmount,
+              date: txDate,
+              note: note.trim() || undefined,
+              transactionDetails: formData
+            },
+            saveAsFastEntry,
+            receiptFile
+          );
+        }
       }
       
       // Refresh the context so the dashboard updates
       await refreshCycle();
       await refreshTransactions();
-      if (saveAsFastEntry) {
+      if (saveAsFastEntry && !splitEnabled) {
         await refreshFastEntries();
       }
       
@@ -266,7 +333,7 @@ export function AddTransactionDrawer({
       handleClose();
     } catch (error: any) {
       console.error("Failed to save transaction:", error);
-      alert(error.message || "Failed to save transaction.");
+      toast.error(error.message || "Failed to save transaction.");
       setIsSaving(false);
     } finally {
       setIsSaving(false);
@@ -518,7 +585,7 @@ export function AddTransactionDrawer({
                                 const file = e.target.files?.[0];
                                 if (file) {
                                   if (file.size > 10 * 1024 * 1024) {
-                                    alert("File size must be less than 10MB");
+                                    toast.error("File size must be less than 10MB");
                                     return;
                                   }
                                   setReceiptFile(file);
@@ -531,24 +598,187 @@ export function AddTransactionDrawer({
                     </div>
                   </div>
                   
+                  {/* Split Expense Toggle */}
+                  {!editTransaction && activeCategory.type !== 'INCOME' && (
+                    <div className="bg-card rounded-[24px] p-5 shadow-neu-extrude border border-primary/5 flex flex-col gap-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[15px] font-bold text-foreground">Split this expense</span>
+                          <span className="text-[12px] font-medium text-muted-foreground/70">Split bill with other people</span>
+                        </div>
+                        <button
+                          onClick={() => setSplitEnabled(!splitEnabled)}
+                          className={`w-14 h-8 rounded-full transition-colors relative flex items-center px-1 ${splitEnabled ? 'bg-gradient-to-r from-[#355C7D] to-[#2A4A65]' : 'bg-border'}`}
+                        >
+                          <motion.div
+                            animate={{ x: splitEnabled ? 24 : 0 }}
+                            className="w-6 h-6 rounded-full bg-card shadow-neu-extrude"
+                          />
+                        </button>
+                      </div>
+
+                      {splitEnabled && (
+                        <div className="flex flex-col gap-4 pt-4 border-t border-border">
+                          {/* Participants */}
+                          <div className="flex flex-col gap-2">
+                            <span className="text-[13px] font-bold text-muted-foreground/80 pl-1">Split with</span>
+                            <div className="flex flex-col gap-2">
+                              {Object.values(DEV_USERS).map(u => {
+                                const isCreator = u.userId === userId;
+                                const isSelected = selectedParticipants.includes(u.userId);
+                                return (
+                                  <label key={u.userId} className={`flex items-center gap-3 p-3 rounded-[16px] border ${isSelected ? 'border-primary/30 bg-primary/5' : 'border-border bg-card'} cursor-pointer`}>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={isSelected}
+                                      disabled={isCreator}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          if (selectedParticipants.length >= 10) {
+                                            toast.error("Maximum 10 participants allowed.");
+                                            return;
+                                          }
+                                          setSelectedParticipants([...selectedParticipants, u.userId]);
+                                        } else {
+                                          setSelectedParticipants(selectedParticipants.filter(id => id !== u.userId));
+                                        }
+                                      }}
+                                      className="w-5 h-5 rounded border-primary text-primary focus:ring-primary"
+                                    />
+                                    <span className="text-[15px] font-semibold">{isCreator ? 'You' : u.username}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Split Method */}
+                          <div className="flex flex-col gap-2 pt-2">
+                            <span className="text-[13px] font-bold text-muted-foreground/80 pl-1">Split method</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setSplitMethod('EQUAL')}
+                                className={`flex-1 py-2.5 rounded-[16px] text-[14px] font-bold transition-colors border ${splitMethod === 'EQUAL' ? 'bg-[#355C7D] text-white border-[#355C7D]' : 'bg-card text-foreground border-border'}`}
+                              >
+                                Equal
+                              </button>
+                              <button
+                                onClick={() => setSplitMethod('MANUAL')}
+                                className={`flex-1 py-2.5 rounded-[16px] text-[14px] font-bold transition-colors border ${splitMethod === 'MANUAL' ? 'bg-[#355C7D] text-white border-[#355C7D]' : 'bg-card text-foreground border-border'}`}
+                              >
+                                Manual
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Preview/Inputs */}
+                          <div className="flex flex-col gap-3 pt-2">
+                            {splitMethod === 'EQUAL' ? (
+                              <div className="flex flex-col gap-2 bg-muted p-4 rounded-[16px]">
+                                <div className="flex justify-between text-[13px] font-bold text-muted-foreground mb-2">
+                                  <span>Total: {currencySymbol}{Number(amount || 0).toFixed(2)}</span>
+                                  <span>{selectedParticipants.length} people</span>
+                                </div>
+                                {(() => {
+                                  const totalMinor = Math.round(Number(amount || 0) * 100);
+                                  const num = selectedParticipants.length;
+                                  const baseMinor = Math.floor(totalMinor / (num || 1));
+                                  let rem = totalMinor % (num || 1);
+                                  
+                                  return selectedParticipants.map(uid => {
+                                    let share = baseMinor;
+                                    if (rem > 0) { share += 1; rem -= 1; }
+                                    const user = Object.values(DEV_USERS).find(u => u.userId === uid);
+                                    return (
+                                      <div key={uid} className="flex justify-between text-[14px] font-semibold">
+                                        <span>{uid === userId ? 'You' : user?.username}</span>
+                                        <span>{currencySymbol}{(share / 100).toFixed(2)}</span>
+                                      </div>
+                                    );
+                                  });
+                                })()}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-3">
+                                {selectedParticipants.map(uid => {
+                                  const user = Object.values(DEV_USERS).find(u => u.userId === uid);
+                                  return (
+                                    <div key={uid} className="flex items-center justify-between gap-4">
+                                      <span className="text-[14px] font-semibold min-w-[60px] truncate">{uid === userId ? 'You' : user?.username}</span>
+                                      <div className="relative flex-1 max-w-[200px]">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">{currencySymbol}</span>
+                                        <input
+                                          type="number"
+                                          value={manualShares[uid] || ''}
+                                          onChange={(e) => setManualShares({ ...manualShares, [uid]: e.target.value })}
+                                          placeholder="0.00"
+                                          className="w-full bg-muted border border-border rounded-[12px] pl-8 pr-4 py-2 text-[14px] font-semibold text-foreground outline-none focus:border-primary/30"
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                                {(() => {
+                                  const total = Number(amount || 0);
+                                  const sum = selectedParticipants.reduce((acc, uid) => acc + (Number(manualShares[uid]) || 0), 0);
+                                  const diff = total - sum;
+                                  return (
+                                    <div className="flex flex-col gap-1 mt-2 text-[13px] font-bold p-3 bg-muted rounded-[12px]">
+                                      <div className="flex justify-between text-muted-foreground">
+                                        <span>Total bill: {currencySymbol}{total.toFixed(2)}</span>
+                                        <span>Assigned: {currencySymbol}{sum.toFixed(2)}</span>
+                                      </div>
+                                      {diff > 0.001 ? (
+                                        <div className="flex justify-between text-[#355C7D]">
+                                          <span>Remaining:</span>
+                                          <span>{currencySymbol}{diff.toFixed(2)}</span>
+                                        </div>
+                                      ) : diff < -0.001 ? (
+                                        <div className="flex justify-between text-red-500">
+                                          <span>Over by:</span>
+                                          <span>{currencySymbol}{Math.abs(diff).toFixed(2)}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex justify-between text-green-600">
+                                          <span>Remaining:</span>
+                                          <span>{currencySymbol}0.00</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Save as Fast Entry Toggle (Only when creating) */}
                   {!editTransaction && (
                     <div className="bg-card rounded-[24px] p-5 shadow-neu-extrude border border-primary/5 flex items-center justify-between">
                       <div className="flex flex-col gap-1">
                         <span className="text-[15px] font-bold text-foreground">Save as Fast Entry</span>
-                        <span className="text-[12px] font-medium text-muted-foreground/70">Quickly add this exact transaction later</span>
+                        {splitEnabled ? (
+                          <span className="text-[12px] font-medium text-amber-500">Fast Entry isn't available for split expenses.</span>
+                        ) : (
+                          <span className="text-[12px] font-medium text-muted-foreground/70">Quickly add this exact transaction later</span>
+                        )}
                       </div>
                       <button
-                        onClick={() => setSaveAsFastEntry(!saveAsFastEntry)}
-                        className={`w-14 h-8 rounded-full transition-colors relative flex items-center px-1 ${saveAsFastEntry ? 'bg-gradient-to-r from-[#355C7D] to-[#2A4A65]' : 'bg-border'}`}
+                        onClick={() => !splitEnabled && setSaveAsFastEntry(!saveAsFastEntry)}
+                        disabled={splitEnabled}
+                        className={`w-14 h-8 rounded-full transition-colors relative flex items-center px-1 ${saveAsFastEntry && !splitEnabled ? 'bg-gradient-to-r from-[#355C7D] to-[#2A4A65]' : 'bg-border'} ${splitEnabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <motion.div
-                          animate={{ x: saveAsFastEntry ? 24 : 0 }}
+                          animate={{ x: saveAsFastEntry && !splitEnabled ? 24 : 0 }}
                           className="w-6 h-6 rounded-full bg-card shadow-neu-extrude"
                         />
                       </button>
                     </div>
                   )}
+
 
                   {/* Save Button */}
                   <button
