@@ -3,9 +3,7 @@ import { Drawer } from 'vaul';
 import { X, Users, Crown, Shield, UserCheck, Calendar, AlertCircle } from 'lucide-react';
 import { Group, GroupMember, GroupService } from '../../services/group.service';
 import { useAuth } from '../../context/AuthContext';
-import { DEV_USERS } from '../../services/auth/developmentAuthProvider';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { getUserDisplayName } from '../../utils/userResolver';
 
 interface GroupMembersDrawerProps {
   isOpen: boolean;
@@ -42,33 +40,14 @@ export function GroupMembersDrawer({ isOpen, onClose, groupId }: GroupMembersDra
         const activeMembers = await GroupService.getGroupMembers(groupId);
 
         // 3. Resolve display names for each active member
-        // Try DEV_USERS first, then Firestore users collection, fallback to userId
         const memberInfoPromises = activeMembers.map(async (m) => {
-          let displayName = m.userId;
-
-          // Check dev users dictionary
-          const devUserMatch = Object.values(DEV_USERS).find(du => du.userId === m.userId);
-          if (devUserMatch) {
-            displayName = devUserMatch.username;
-          } else {
-            // Check public user profile in Firestore
-            try {
-              const userDocSnap = await getDoc(doc(db, 'users', m.userId));
-              if (userDocSnap.exists()) {
-                const uData = userDocSnap.data();
-                if (uData.username) displayName = uData.username;
-              }
-            } catch (err) {
-              // Ignore failure to fetch user profile, use userId fallback
-            }
-          }
-
+          const resolvedName = await getUserDisplayName(m.userId);
           const isCreator = groupData?.createdBy === m.userId;
           const isCurrentUser = user?.userId === m.userId;
 
           return {
             member: m,
-            displayName,
+            displayName: resolvedName || (isCurrentUser ? 'You' : 'Member'),
             isCreator,
             isCurrentUser,
           } as MemberDisplayInfo;
@@ -210,12 +189,9 @@ export function GroupMembersDrawer({ isOpen, onClose, groupId }: GroupMembersDra
                             )}
                           </div>
                           
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-muted-foreground truncate">
-                              ID: {item.member.userId}
-                            </span>
-                            <span className="text-muted-foreground/40 text-xs">•</span>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Calendar size={12} className="text-muted-foreground/70 shrink-0" />
+                            <span className="text-xs text-muted-foreground">
                               Joined {formatDate(item.member.joinedAt)}
                             </span>
                           </div>

@@ -7,6 +7,7 @@ import { GroupService } from '../../services/group.service';
 import { FinancialSettingsService } from '../../services/financialSettings.service';
 import { EditModal } from '../../components/ui/EditModal';
 import { GroupMembersDrawer } from '../groups/GroupMembersDrawer';
+import { useUserDisplayName } from '../../utils/userResolver';
 
 interface GroupSettingsDrawerProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export function GroupSettingsDrawer({ isOpen, onClose }: GroupSettingsDrawerProp
   const [isAdmin, setIsAdmin] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isMembersDrawerOpen, setIsMembersDrawerOpen] = useState(false);
+  const { displayName: creatorName } = useUserDisplayName(groupDetails?.createdBy);
 
   useEffect(() => {
     async function fetchGroupInfo() {
@@ -114,7 +116,7 @@ export function GroupSettingsDrawer({ isOpen, onClose }: GroupSettingsDrawerProp
         { 
           icon: User, 
           label: 'Creator',
-          value: groupDetails?.createdBy || '',
+          value: groupDetails?.createdBy ? (groupDetails.createdBy === user?.userId ? 'You' : (creatorName || 'Member')) : '',
           onClick: undefined
         },
         { 

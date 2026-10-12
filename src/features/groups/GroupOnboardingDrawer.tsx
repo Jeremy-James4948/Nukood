@@ -240,7 +240,7 @@ export function GroupOnboardingDrawer({ isOpen, onClose }: GroupOnboardingDrawer
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold text-foreground">{devUser.username}</p>
-                  <p className="text-xs text-muted-foreground truncate max-w-[200px]">ID: {devUser.userId}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-[200px]">@{devUser.username.toLowerCase()}</p>
                 </div>
                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'bg-accent border-accent' : 'border-muted-foreground'}`}>
                   {isSelected && <Check size={14} className="text-white" />}

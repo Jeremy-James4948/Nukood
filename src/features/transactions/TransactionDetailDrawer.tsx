@@ -13,6 +13,7 @@ import { GroupService } from '../../services/group.service';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ShieldAlert, Loader2 } from 'lucide-react';
+import { useUserDisplayName } from '../../utils/userResolver';
 
 const neuExtrude = "bg-card shadow-neu-extrude";
 const neuIndent = "bg-card shadow-neu-inset";
@@ -40,6 +41,7 @@ export function TransactionDetailDrawer({ isOpen, onClose, txInfo, activeScope, 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { displayName: creatorDisplayName } = useUserDisplayName(txInfo?.tx.createdBy);
 
   useEffect(() => {
     async function checkAdmin() {
@@ -134,7 +136,7 @@ export function TransactionDetailDrawer({ isOpen, onClose, txInfo, activeScope, 
                 {/* Display creator if it's a group transaction */}
                 {activeScope.type === 'GROUP' && tx.createdBy && (
                   <div className={`mt-2 px-4 py-1.5 rounded-full text-[11px] font-bold text-muted-foreground uppercase tracking-wider bg-primary/5 border border-primary/10`}>
-                    Added by: {tx.createdBy === user?.userId ? 'You' : tx.createdBy}
+                    Added by: {tx.createdBy === user?.userId ? 'You' : (creatorDisplayName || 'Member')}
                   </div>
                 )}
                 <Drawer.Description className="sr-only">Transaction details</Drawer.Description>
