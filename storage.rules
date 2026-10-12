@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Craft rules based on data in Firestore
+// We use firestore.get() to check membership.
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Personal receipts
+    match /users/{userId}/receipts/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Group receipts
+    match /groups/{groupId}/receipts/{allPaths=**} {
+      // Only authenticated, authorized group members can read group receipts.
+      allow read: if request.auth != null 
+                  && request.auth.uid in firestore.get(/databases/(default)/documents/groups/$(groupId)).data.memberIds;
+      
+      // Prevent unauthorized uploads, modifications and deletions.
+      // We only allow creation by active group members.
+      // Wait, can we allow creation? Or should ONLY cloud functions upload?
+      // Since AddTransactionDrawer uploads directly using the client SDK, we MUST allow create.
+      // It just needs to ensure the user is an active member.
+      // Wait, the prompt says: "Prevent unauthorized uploads, modifications and deletions."
+      // Does it mean NO client uploads?
+      // The prompt: "Only authenticated, authorized group members should be able to read group receipts. Prevent unauthorized uploads, modifications and deletions. Preserve existing Personal receipt permissions."
+      // This implies AUTHORIZED uploads are allowed.
+      // Let's allow create for members, but deny update and delete for groups.
+      allow create: if request.auth != null
+                    && request.auth.uid in firestore.get(/databases/(default)/documents/groups/$(groupId)).data.memberIds;
+      
+      allow update, delete: if false;
+    }
+  }
+}

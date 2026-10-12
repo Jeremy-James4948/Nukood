@@ -5,7 +5,7 @@ import { FinancialSettingsService } from '../services/financialSettings.service'
 async function checkUser() {
   const userId = 'dev_jeremy';
   
-  const settings = await FinancialSettingsService.getSettings(userId);
+  const settings = await FinancialSettingsService.getSettings({ type: 'PERSONAL', id: userId });
   console.log('Settings:', settings);
   
   const cyclesRef = collection(db, 'users', userId, 'financialCycles');

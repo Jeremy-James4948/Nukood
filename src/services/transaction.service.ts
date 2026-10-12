@@ -1,10 +1,11 @@
 import { collection, doc, Timestamp, writeBatch, increment, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { FinancialScope, getScopePath } from '../types/FinancialScope';
 import { ReceiptService } from './receipt.service';
 
 export interface Transaction {
   transactionId: string;
-  userId: string;
+  scope: FinancialScope;
   cycleId: string;
   journalId: string;
   categoryId: string;
@@ -28,9 +29,9 @@ export class TransactionService {
    * Creates a new transaction and atomically updates the Financial Cycle's math.
    */
   static async createTransaction(
-    userId: string, 
+    scope: FinancialScope, 
     cycleId: string, 
-    transactionData: Omit<Transaction, 'transactionId' | 'userId' | 'cycleId' | 'journalId' | 'createdAt' | 'updatedAt'>,
+    transactionData: Omit<Transaction, 'transactionId' | 'cycleId' | 'journalId' | 'createdAt' | 'updatedAt'>,
     saveAsFastEntry: boolean,
     receiptFile?: File | null
   ): Promise<void> {
@@ -49,7 +50,7 @@ export class TransactionService {
     const dayNumber = txDate.getDate();
 
     // 2. Transaction Document
-    const transactionsRef = collection(db, 'users', userId, 'transactions');
+    const transactionsRef = collection(db, ...getScopePath(scope), 'transactions');
     const newTxRef = doc(transactionsRef);
     
     const processedCategoryData = { ...transactionData.transactionDetails };
@@ -58,7 +59,7 @@ export class TransactionService {
     // Global Receipt File
     let finalReceiptUrl = transactionData.receiptUrl;
     if (receiptFile) {
-      const metadata = await ReceiptService.uploadReceipt(userId, newTxRef.id, 'global_receipt', receiptFile);
+      const metadata = await ReceiptService.uploadReceipt(scope, newTxRef.id, 'global_receipt', receiptFile);
       finalReceiptUrl = metadata.url;
     }
 
@@ -68,7 +69,6 @@ export class TransactionService {
       transactionDetails: processedCategoryData,
       date: Timestamp.fromDate(txDate), // Ensure Firebase Timestamp
       transactionId: newTxRef.id,
-      userId,
       cycleId,
       journalId,
       createdAt: now,
@@ -85,7 +85,7 @@ export class TransactionService {
     batch.set(newTxRef, newTx);
 
     // 3. Daily Journal Update
-    const journalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', journalId);
+    const journalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', journalId);
     
     // We use set with merge: true. 
     // If it doesn't exist, it creates the fields. If it does, it merges.
@@ -116,7 +116,7 @@ export class TransactionService {
     batch.set(journalRef, journalData, { merge: true });
 
     // 4. Atomic Cycle Update
-    const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+    const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
     
     if (transactionData.transactionType === 'EXPENSE') {
       const cycleUpdates: any = {
@@ -143,7 +143,7 @@ export class TransactionService {
 
     // 3. Fast Entry Creation (Optional)
     if (saveAsFastEntry) {
-      const fastEntriesRef = collection(db, 'users', userId, 'fastEntries');
+      const fastEntriesRef = collection(db, ...getScopePath(scope), 'fastEntries');
       const newFeRef = doc(fastEntriesRef);
       
       const newFe = {
@@ -165,17 +165,17 @@ export class TransactionService {
   /**
    * Deletes a transaction and reverses all associated totals in the journal, cycle, and category summary.
    */
-  static async deleteTransaction(userId: string, cycleId: string, transaction: Transaction): Promise<void> {
+  static async deleteTransaction(scope: FinancialScope, cycleId: string, transaction: Transaction): Promise<void> {
     const batch = writeBatch(db);
     const now = Timestamp.now();
     
     // 1. Delete the transaction document
-    const txRef = doc(db, 'users', userId, 'transactions', transaction.transactionId);
+    const txRef = doc(db, ...getScopePath(scope), 'transactions', transaction.transactionId);
     batch.delete(txRef);
 
     // 2. Decrement Journal Stats
     if (transaction.journalId) {
-      const journalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', transaction.journalId);
+      const journalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', transaction.journalId);
       const isExpense = transaction.transactionType === 'EXPENSE';
       const journalUpdates: any = {
         transactionCount: increment(-1),
@@ -191,7 +191,7 @@ export class TransactionService {
     }
 
     // 3. Decrement Cycle and Category Summary Stats
-    const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+    const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
     
     if (transaction.transactionType === 'EXPENSE') {
       const cycleUpdates: any = {
@@ -222,7 +222,7 @@ export class TransactionService {
    * If the category changed, it rolls back the old category and applies to the new.
    */
   static async updateTransaction(
-    userId: string,
+    scope: FinancialScope,
     cycleId: string,
     oldTransaction: Transaction,
     updates: Partial<Transaction>,
@@ -232,11 +232,10 @@ export class TransactionService {
     const now = Timestamp.now();
 
     // 1. Update the transaction document
-    const txRef = doc(db, 'users', userId, 'transactions', oldTransaction.transactionId);
+    const txRef = doc(db, ...getScopePath(scope), 'transactions', oldTransaction.transactionId);
     
     const safeUpdates: any = { ...updates, updatedAt: now };
     delete safeUpdates.transactionId;
-    delete safeUpdates.userId;
     delete safeUpdates.cycleId;
     delete safeUpdates.createdAt;
 
@@ -263,7 +262,7 @@ export class TransactionService {
     }
 
     if (receiptFile) {
-      const metadata = await ReceiptService.uploadReceipt(userId, oldTransaction.transactionId, 'global_receipt', receiptFile);
+      const metadata = await ReceiptService.uploadReceipt(scope, oldTransaction.transactionId, 'global_receipt', receiptFile);
       safeUpdates.receiptUrl = metadata.url;
       // Note: we could delete the old global receipt here if we wanted to be perfectly clean, 
       // but standard firebase storage doesn't strictly require it if we overwrite the same path.
@@ -296,7 +295,7 @@ export class TransactionService {
       const oldCategory = oldTransaction.categoryId;
       const categoryChanged = newCategory !== oldCategory;
 
-      const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+      const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
       
       const cycleUpdates: any = {
         totalSpent: increment(amountDiff),
@@ -319,7 +318,7 @@ export class TransactionService {
       if (dateChanged && oldTransaction.journalId) {
         // Transaction moved to a different calendar day.
         // Step 1: Remove it from the old journal.
-        const oldJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
+        const oldJournalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
         const oldJournalUpdates: any = {
           totalSpent: increment(-oldAmount),
           transactionCount: increment(-1),
@@ -333,7 +332,7 @@ export class TransactionService {
         // Step 2: Add it to the new journal (creates the document if it doesn't exist yet).
         const newDate = updates.date as Date;
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const newJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', newJournalId);
+        const newJournalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', newJournalId);
         const newJournalData: any = {
           journalId: newJournalId,
           cycleId,
@@ -353,7 +352,7 @@ export class TransactionService {
 
       } else if ((amountDiff !== 0 || categoryChanged) && oldTransaction.journalId) {
         // Same day — patch amounts and/or category on the existing journal.
-        const journalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
+        const journalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
         const journalUpdates: any = {};
         
         if (amountDiff !== 0) {
@@ -380,7 +379,7 @@ export class TransactionService {
       const amountDiff = newAmount - oldTransaction.amount;
       
       if (amountDiff !== 0) {
-        const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+        const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
         batch.update(cycleRef, {
           'budgetSnapshot.availableBalance': increment(amountDiff),
           updatedAt: now
@@ -390,12 +389,12 @@ export class TransactionService {
       // Move transactionCount between journals if the date changed.
       // Income doesn't affect totalSpent, but it does contribute to the day's transactionCount.
       if (dateChanged && oldTransaction.journalId) {
-        const oldJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
+        const oldJournalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', oldTransaction.journalId);
         batch.update(oldJournalRef, { transactionCount: increment(-1) });
 
         const newDate = updates.date as Date;
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const newJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', newJournalId);
+        const newJournalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', newJournalId);
         batch.set(newJournalRef, {
           journalId: newJournalId,
           cycleId,
@@ -415,8 +414,8 @@ export class TransactionService {
   /**
    * Fetches all transactions for a specific Financial Cycle.
    */
-  static async getTransactionsForCycle(userId: string, cycleId: string): Promise<Transaction[]> {
-    const transactionsRef = collection(db, 'users', userId, 'transactions');
+  static async getTransactionsForCycle(scope: FinancialScope, cycleId: string): Promise<Transaction[]> {
+    const transactionsRef = collection(db, ...getScopePath(scope), 'transactions');
     // Removed orderBy('date', 'desc') to avoid requiring a Firebase Composite Index
     const q = query(
       transactionsRef, 
@@ -443,10 +442,10 @@ export class TransactionService {
    * Fetches transactions specifically for the selected journals.
    * Handles Firestore's 'in' query limit of 10 items by batching.
    */
-  static async getTransactionsForJournals(userId: string, journalIds: string[]): Promise<Transaction[]> {
+  static async getTransactionsForJournals(scope: FinancialScope, journalIds: string[]): Promise<Transaction[]> {
     if (!journalIds || journalIds.length === 0) return [];
     
-    const transactionsRef = collection(db, 'users', userId, 'transactions');
+    const transactionsRef = collection(db, ...getScopePath(scope), 'transactions');
     const allTransactions: Transaction[] = [];
     
     // Firestore 'in' queries are limited to 10 items
@@ -463,23 +462,30 @@ export class TransactionService {
         const data = doc.data();
         return {
           ...data,
-          date: data.date?.toDate(),
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate(),
+          transactionId: data.transactionId || doc.id,
+          date: data.date?.toDate ? data.date.toDate() : (data.date ? new Date(data.date) : new Date()),
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
         } as Transaction;
       });
       
       allTransactions.push(...chunkTxs);
     }
     
-    // Sort in memory (descending by date)
-    return allTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
+    // Deduplicate and sort in memory (descending by date)
+    const uniqueMap = new Map<string, Transaction>();
+    for (const tx of allTransactions) {
+      if (!uniqueMap.has(tx.transactionId)) {
+        uniqueMap.set(tx.transactionId, tx);
+      }
+    }
+    return Array.from(uniqueMap.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
   /**
    * Temporary migration function to heal transactions created before Daily Journals architecture
    */
-  static async migrateMissingJournals(userId: string, cycleId: string, missingTransactions: Transaction[]): Promise<void> {
+  static async migrateMissingJournals(scope: FinancialScope, cycleId: string, missingTransactions: Transaction[]): Promise<void> {
     const batch = writeBatch(db);
     const now = Timestamp.now();
     
@@ -516,13 +522,13 @@ export class TransactionService {
       }
 
       // Update the transaction itself with the journalId
-      const txRef = doc(db, 'users', userId, 'transactions', tx.transactionId);
+      const txRef = doc(db, ...getScopePath(scope), 'transactions', tx.transactionId);
       batch.update(txRef, { journalId });
     }
 
     // Add journal sets to batch
     for (const [jId, jData] of Object.entries(journalsToCreate)) {
-      const journalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', jId);
+      const journalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', jId);
       batch.set(journalRef, jData, { merge: true });
     }
 
@@ -532,10 +538,10 @@ export class TransactionService {
   /**
    * Temporarily fix dates from Aug 5 to Aug 4
    */
-  static async fixDates(userId: string, cycleId: string): Promise<void> {
+  static async fixDates(scope: FinancialScope, cycleId: string): Promise<void> {
     const batch = writeBatch(db);
     const now = Timestamp.now();
-    const txRef = collection(db, 'users', userId, 'transactions');
+    const txRef = collection(db, ...getScopePath(scope), 'transactions');
     const q = query(txRef, where('cycleId', '==', cycleId));
     const snap = await getDocs(q);
 
@@ -561,8 +567,8 @@ export class TransactionService {
     }
 
     if (movedCount > 0) {
-      const oldJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', oldJournalId);
-      const newJournalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', newJournalId);
+      const oldJournalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', oldJournalId);
+      const newJournalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', newJournalId);
 
       // Create/Update new journal (Aug 4)
       batch.set(newJournalRef, {

@@ -33,14 +33,18 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateSplitPayment = exports.splitExpense = void 0;
+exports.deleteGroupTransaction = exports.groupTransaction = exports.updateSplitPayment = exports.splitExpense = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v2/https");
 const createSplitExpense_1 = require("./split/createSplitExpense");
 const updateSplitPaymentStatus_1 = require("./split/updateSplitPaymentStatus");
+const createGroupTransaction_1 = require("./group/createGroupTransaction");
+const deleteGroupTransaction_1 = require("./group/deleteGroupTransaction");
 // Initialize Firebase Admin SDK
 admin.initializeApp();
 // Export the Split Expense endpoint
 exports.splitExpense = (0, https_1.onCall)({ region: "us-central1" }, createSplitExpense_1.createSplitExpense);
 exports.updateSplitPayment = (0, https_1.onCall)({ region: "us-central1" }, updateSplitPaymentStatus_1.updateSplitPaymentStatus);
+exports.groupTransaction = (0, https_1.onCall)({ region: "us-central1" }, createGroupTransaction_1.createGroupTransaction);
+exports.deleteGroupTransaction = (0, https_1.onCall)({ region: "us-central1" }, deleteGroupTransaction_1.deleteGroupTransaction);
 //# sourceMappingURL=index.js.map

@@ -3,13 +3,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingBag, Plus, X, Camera } from 'lucide-react';
 import { AddTransactionDrawer } from '../transactions/AddTransactionDrawer';
 import { SettingsDrawer } from '../settings/SettingsDrawer';
+import { GroupSettingsDrawer } from '../settings/GroupSettingsDrawer';
+import { TransactionDetailDrawer } from '../transactions/TransactionDetailDrawer';
 import { useCurrencyFormatter } from '../../utils/currency';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { IconMap } from '../../constants/icons';
 import { useThemeMotion } from '../../hooks/useThemeMotion';
 export function DailyCardCarousel() {
   const { formatAmount, formatNumber, currencySymbol } = useCurrencyFormatter();
-  const { transactions, categories, dailyJournals } = useFinancialEngine();
+  const { transactions, categories, dailyJournals, activeScope } = useFinancialEngine();
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { variants } = useThemeMotion();
@@ -18,6 +20,7 @@ export function DailyCardCarousel() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [fastEntryContext, setFastEntryContext] = useState<{name?: string, category: string, icon?: string, price?: string, quantity?: string, unit?: string, notes?: string} | null>(null);
   const [scannedReceipt, setScannedReceipt] = useState<File | null>(null);
+  const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
 
   const handleOpenAddTx = (fastEntry: {name?: string, category: string, icon?: string, price?: string, quantity?: string, unit?: string, notes?: string} | null = null, receipt: File | null = null) => {
     setFastEntryContext(fastEntry);
@@ -117,10 +120,14 @@ export function DailyCardCarousel() {
           };
         });
 
+      const [, jYear, jMonth, jDay] = journal.journalId.split('_');
+      // Create a stable local date reference at noon to extract month names reliably
+      const stableDate = new Date(parseInt(jYear), parseInt(jMonth) - 1, parseInt(jDay), 12, 0, 0);
+
       return {
         id: journal.journalId,
-        date: journal.date.getDate().toString(),
-        month: getMonthShort(journal.date),
+        date: parseInt(jDay).toString(),
+        month: getMonthShort(stableDate),
         day: journal.dayName,
         spent: journal.totalSpent,
         transactions: journal.transactionCount,
@@ -363,7 +370,11 @@ export function DailyCardCarousel() {
 
                   <div className="flex-1 overflow-y-auto hide-scrollbar flex flex-col gap-3 -mx-2 px-2 pb-6">
                     {activeData.recent.map((item, idx) => (
-                      <div key={item.id || idx} className={`group flex items-center justify-between p-4 rounded-[24px] ${neuExtrude} ${neuExtrudeHover}`}>
+                      <div 
+                        key={item.id || idx} 
+                        onClick={() => setSelectedTxId(item.id)}
+                        className={`group flex items-center justify-between p-4 rounded-[24px] cursor-pointer ${neuExtrude} ${neuExtrudeHover}`}
+                      >
                         <div className="flex items-center gap-4">
                           <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${neuIndent}`}>
                             {React.cloneElement(item.icon as React.ReactElement, { size: 20 })}
@@ -399,10 +410,33 @@ export function DailyCardCarousel() {
         initialContext={fastEntryContext} 
         initialReceipt={scannedReceipt}
       />
-      <SettingsDrawer 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-      />
+      {activeScope.type === 'GROUP' ? (
+        <GroupSettingsDrawer 
+          isOpen={isSettingsOpen} 
+          onClose={() => setIsSettingsOpen(false)} 
+        />
+      ) : (
+        <SettingsDrawer 
+          isOpen={isSettingsOpen} 
+          onClose={() => setIsSettingsOpen(false)} 
+        />
+      )}
+
+      {selectedTxId && (
+        <TransactionDetailDrawer
+          isOpen={!!selectedTxId}
+          onClose={() => setSelectedTxId(null)}
+          txInfo={(() => {
+            const tx = transactions.find(t => t.transactionId === selectedTxId);
+            if (!tx) return null;
+            return {
+              tx,
+              category: categories.find(c => c.categoryId === tx.categoryId)
+            };
+          })()}
+          activeScope={activeScope}
+        />
+      )}
     </>
   );
 }

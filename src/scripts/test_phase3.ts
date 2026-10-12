@@ -166,7 +166,7 @@ async function testExistingUser(): Promise<boolean> {
 
   // Snapshot BEFORE
   const settingsBefore = await readSettingsRaw(userId);
-  const cyclesBefore = await FinancialCycleService.getAllCycles(userId);
+  const cyclesBefore = await FinancialCycleService.getAllCycles({ type: 'PERSONAL', id: userId });
 
   if (!settingsBefore) {
     fail('Pre-condition', 'dev_jeremy has no settings — cannot verify existing-user protection');
@@ -194,7 +194,7 @@ async function testExistingUser(): Promise<boolean> {
 
   // Snapshot AFTER
   const settingsAfter = await readSettingsRaw(userId);
-  const cyclesAfter = await FinancialCycleService.getAllCycles(userId);
+  const cyclesAfter = await FinancialCycleService.getAllCycles({ type: 'PERSONAL', id: userId });
 
   let allPassed = true;
 
@@ -243,18 +243,18 @@ async function testNewUser(): Promise<{ passed: boolean; cycleId: string }> {
   if (existingSettings?.isOnboarded === true) {
     console.log('  [Setup] dev_jj already onboarded from a previous run.');
     console.log('  [Setup] Resetting isOnboarded = false to test initialization...');
-    await FinancialSettingsService.updateSettings(userId, { isOnboarded: false } as any);
+    await FinancialSettingsService.updateSettings({ type: 'PERSONAL', id: userId }, { isOnboarded: false } as any);
 
     // Also delete any existing active cycle to avoid false-positive idempotency result
     // (We only delete cycles with name matching our test, leaving any real data untouched)
-    const allCycles = await FinancialCycleService.getAllCycles(userId);
+    const allCycles = await FinancialCycleService.getAllCycles({ type: 'PERSONAL', id: userId });
     const testCycles = allCycles.filter((c) => c.cycleName === 'August' && c.status === 'ACTIVE');
     if (testCycles.length > 0) {
       console.log(`  [Setup] Found ${testCycles.length} test cycle(s) to remove for clean test.`);
       // We cannot delete in Firestore client SDK without a reference, so we mark as completed
       // to prevent the service from reading them as the active cycle. For test purity only.
       for (const tc of testCycles) {
-        await FinancialCycleService.updateCycleName(userId, tc.cycleId, `__test_reset_${tc.cycleId}`);
+        await FinancialCycleService.updateCycleName({ type: 'PERSONAL', id: userId }, tc.cycleId, `__test_reset_${tc.cycleId}`);
       }
     }
   }

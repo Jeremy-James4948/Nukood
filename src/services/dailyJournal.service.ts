@@ -1,5 +1,6 @@
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { FinancialScope, getScopePath } from '../types/FinancialScope';
 
 export interface DailyJournal {
   journalId: string;
@@ -22,8 +23,8 @@ export class DailyJournalService {
   /**
    * Fetches all Daily Journals for a specific Financial Cycle, ordered chronologically (oldest first).
    */
-  static async getDailyJournalsForCycle(userId: string, cycleId: string): Promise<DailyJournal[]> {
-    const journalsRef = collection(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals');
+  static async getDailyJournalsForCycle(scope: FinancialScope, cycleId: string): Promise<DailyJournal[]> {
+    const journalsRef = collection(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals');
     
     // We can use an in-memory sort or Firestore orderBy depending on indexes.
     // For now, let's fetch all for the cycle and sort in memory to avoid needing a new index immediately.

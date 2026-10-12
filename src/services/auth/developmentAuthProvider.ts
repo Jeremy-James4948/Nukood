@@ -66,7 +66,7 @@ export class DevelopmentAuthProvider implements AuthProvider {
     // Fetch actual name from live database, fallback to hardcoded if not found
     let realName = userEntry.username;
     try {
-      const settings = await FinancialSettingsService.getSettings(userEntry.userId);
+      const settings = await FinancialSettingsService.getSettings({ type: 'PERSONAL', id: userEntry.userId });
       if (settings && settings.profileName) {
         realName = settings.profileName;
       }

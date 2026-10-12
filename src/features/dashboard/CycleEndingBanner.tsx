@@ -4,9 +4,10 @@ import { AlertCircle, X, Settings2 } from 'lucide-react';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { FinancialEngine } from '../../utils/FinancialEngine';
 import { SettingsDrawer } from '../settings/SettingsDrawer';
+import { GroupSettingsDrawer } from '../settings/GroupSettingsDrawer';
 
 export function CycleEndingBanner() {
-  const { activeCycle, settings } = useFinancialEngine();
+  const { activeCycle, settings, activeScope } = useFinancialEngine();
   const [isVisible, setIsVisible] = useState(false);
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -107,7 +108,11 @@ export function CycleEndingBanner() {
           </div>
         </motion.div>
       </AnimatePresence>
-      <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      {activeScope?.type === 'GROUP' ? (
+        <GroupSettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      ) : (
+        <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      )}
     </>
   );
 }

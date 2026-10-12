@@ -20,6 +20,7 @@ import { CategoryService, Category } from '../../services/category.service';
 import { useCurrencyFormatter } from '../../utils/currency';
 import { AddTransactionDrawer } from '../transactions/AddTransactionDrawer';
 import { ReceiptViewer } from '../../components/ui/ReceiptViewer';
+import { TransactionDetailDrawer } from '../transactions/TransactionDetailDrawer';
 
 const neuExtrude = "bg-card shadow-neu-extrude";
 const neuExtrudeHover = "hover:shadow-neu-extrude hover:scale-[0.98] transition-all";
@@ -138,7 +139,7 @@ interface HistoryFilters {
 }
 
 export function HistoryView() {
-  const { activeCycle, userId } = useFinancialEngine();
+  const { activeScope, activeCycle, userId } = useFinancialEngine();
   const [cycles, setCycles] = useState<FinancialCycle[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState<string | null>(null);
   
@@ -167,7 +168,7 @@ export function HistoryView() {
     if (!userId) return;
     
     CategoryService.getAllCategories().then(setCategories);
-    FinancialCycleService.getAllCycles(userId).then((fetched) => {
+    FinancialCycleService.getAllCycles(activeScope).then((fetched) => {
       setCycles(fetched);
       if (activeCycle) {
         setSelectedCycleId(activeCycle.cycleId);
@@ -181,9 +182,9 @@ export function HistoryView() {
   useEffect(() => {
     if (!userId || !selectedCycleId) return;
     
-    TransactionService.getTransactionsForCycle(userId, selectedCycleId)
+    TransactionService.getTransactionsForCycle(activeScope, selectedCycleId)
       .then(setTransactions);
-  }, [userId, selectedCycleId]);
+  }, [activeScope, selectedCycleId]);
 
   const handleDelete = async (id: string) => {
     if (!userId || !selectedCycleId) return;
@@ -197,7 +198,7 @@ export function HistoryView() {
     }
     
     // Backend deletion
-    await TransactionService.deleteTransaction(userId, selectedCycleId, txToDelete);
+    await TransactionService.deleteTransaction(activeScope, selectedCycleId, txToDelete);
   };
 
   // Filter & Group Transactions
@@ -390,8 +391,12 @@ export function HistoryView() {
                     cycleName={cycles.find(c => c.cycleId === tx.cycleId)?.cycleName}
                     delay={(groupIdx * 0.1) + (i * 0.05)}
                     onClick={setSelectedTxInfo}
-                    onDelete={handleDelete}
+                    onDelete={activeScope.type === 'GROUP' ? () => alert("Group transactions cannot be deleted yet.") : handleDelete}
                     onEdit={() => {
+                      if (activeScope.type === 'GROUP') {
+                        alert("Group transactions cannot be edited yet.");
+                        return;
+                      }
                       setSelectedTxInfo({
                         tx,
                         category: categories.find(c => c.categoryId === tx.categoryId),
@@ -408,126 +413,14 @@ export function HistoryView() {
       </div>
 
       {/* Transaction Detail Drawer */}
-      <Drawer.Root open={selectedTxInfo !== null} onOpenChange={(open) => !open && setSelectedTxInfo(null)}>
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-black/10 backdrop-blur-sm z-[200]" />
-          <Drawer.Content className={`bg-card flex flex-col rounded-t-[40px] mt-12 max-h-[90vh] fixed bottom-0 left-0 right-0 z-[201] max-w-[428px] mx-auto shadow-2xl outline-none`}>
-
-            <div className={`pt-6 pb-2 px-8 flex flex-col items-center shrink-0 relative rounded-t-[40px]`}>
-              <div className={`w-12 h-1.5 rounded-full mb-8 ${neuIndent}`} />
-
-              <button
-                onClick={() => setSelectedTxInfo(null)}
-                className={`absolute top-6 right-6 p-2 rounded-full text-foreground ${neuExtrude}`}
-              >
-                <X size={20} />
-              </button>
-
-              {selectedTxInfo && (
-                <div className="flex flex-col items-center w-full mb-6">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${neuIndent}`} style={{ color: selectedTxInfo.category?.color || '#355C7D' }}>
-                    {(() => {
-                      const IconComp = (selectedTxInfo.category && (Icons as any)[selectedTxInfo.category.icon]) || Icons.Circle;
-                      return <IconComp size={28} strokeWidth={2.5} />
-                    })()}
-                  </div>
-                  <span className={`text-[40px] font-bold tracking-tighter leading-none mb-2 ${selectedTxInfo.tx.transactionType === 'INCOME' ? 'text-success' : 'text-foreground'}`}>
-                    {selectedTxInfo.tx.transactionType === 'INCOME' ? '+' : ''}{formatAmount(selectedTxInfo.tx.amount)}
-                  </span>
-                  <Drawer.Title className="text-[18px] font-bold text-foreground">{selectedTxInfo.tx.title}</Drawer.Title>
-                  <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                    {selectedTxInfo.category?.name || 'Uncategorized'} • {new Date(selectedTxInfo.tx.date).toLocaleDateString()}
-                  </span>
-                  <div className={`mt-4 px-4 py-1.5 rounded-full text-[11px] font-bold text-muted-foreground uppercase tracking-wider ${neuIndent}`}>
-                    {cycles.find(c => c.cycleId === selectedTxInfo.tx.cycleId)?.cycleName || 'Unknown Cycle'}
-                  </div>
-                  <Drawer.Description className="sr-only">Transaction details</Drawer.Description>
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto hide-scrollbar px-6 py-6 pb-32" data-vaul-no-drag>
-              {selectedTxInfo && (
-                <div className="flex flex-col gap-8">
-
-                  {/* Metadata Block */}
-                  <div>
-                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block pl-2">Transaction Details</span>
-                    <div className={`rounded-[24px] flex flex-col p-3 gap-3 ${neuExtrude}`}>
-                      <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-1 ${neuIndent}`}>
-                        <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Date & Time</span>
-                        <span className="text-[15px] font-bold text-foreground">{new Date(selectedTxInfo.tx.date).toLocaleString()}</span>
-                      </div>
-                      
-                      {selectedTxInfo.tx.note && (
-                        <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-1 ${neuIndent}`}>
-                          <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Notes</span>
-                          <span className="text-[15px] font-bold text-foreground">{selectedTxInfo.tx.note}</span>
-                        </div>
-                      )}
-
-                      {/* Receipt Status & Action */}
-                      {selectedTxInfo.tx.transactionDetails?.receipt?.attached && (
-                        <div className={`flex flex-col px-5 py-4 rounded-[16px] gap-3 ${neuIndent}`}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Receipt</span>
-                            <span className="text-[14px] font-bold text-foreground">Attached</span>
-                          </div>
-                          <button
-                            onClick={() => setReceiptViewerConfig({
-                              isOpen: true,
-                              storagePath: selectedTxInfo.tx.transactionDetails.receipt.storagePath,
-                              fileName: selectedTxInfo.tx.transactionDetails.receipt.fileName,
-                              fileType: selectedTxInfo.tx.transactionDetails.receipt.fileType,
-                            })}
-                            className={`flex items-center justify-center gap-2 py-3 rounded-[12px] text-[14px] font-bold text-foreground transition-transform active:scale-[0.98] ${neuExtrude}`}
-                          >
-                            <ExternalLink size={16} />
-                            View Receipt
-                          </button>
-                        </div>
-                      )}
-                      
-                      {selectedTxInfo.tx.fastEntryId && (
-                         <div className={`flex items-center justify-between px-5 py-4 rounded-[16px] ${neuIndent}`}>
-                           <span className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider">Method</span>
-                           <span className="text-[14px] font-bold text-yellow-600 flex items-center gap-1.5"><Zap size={14}/> Fast Entry</span>
-                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions Block */}
-                  <div>
-                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3 block pl-2">Actions</span>
-                    <div className={`rounded-[24px] flex flex-col p-3 gap-3 ${neuExtrude}`}>
-                      <button 
-                        onClick={() => setIsEditDrawerOpen(true)}
-                        className={`flex items-center gap-3 px-5 py-4 rounded-[16px] text-left transition-transform active:scale-[0.98] ${neuIndent}`}
-                      >
-                        <Edit2 size={18} className="text-foreground" />
-                        <span className="text-[15px] font-bold text-foreground">Edit Transaction</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm("Are you sure you want to delete this transaction? This will automatically update your budget and balances.")) {
-                             handleDelete(selectedTxInfo.tx.transactionId);
-                          }
-                        }}
-                        className={`flex items-center gap-3 px-5 py-4 rounded-[16px] text-left transition-transform active:scale-[0.98] ${neuIndent}`}
-                      >
-                        <Trash2 size={18} className="text-error" />
-                        <span className="text-[15px] font-bold text-error">Delete</span>
-                      </button>
-                    </div>
-                  </div>
-
-                </div>
-              )}
-            </div>
-          </Drawer.Content>
-        </Drawer.Portal>
-      </Drawer.Root>
+      <TransactionDetailDrawer
+        isOpen={selectedTxInfo !== null}
+        onClose={() => setSelectedTxInfo(null)}
+        txInfo={selectedTxInfo}
+        activeScope={activeScope}
+        onEdit={() => setIsEditDrawerOpen(true)}
+        onDelete={handleDelete}
+      />
 
       {/* Edit Drawer */}
       <AddTransactionDrawer
@@ -536,8 +429,8 @@ export function HistoryView() {
         initialContext={null}
         editTransaction={selectedTxInfo?.tx || null}
         onSuccess={() => {
-          if (userId && selectedCycleId) {
-            TransactionService.getTransactionsForCycle(userId, selectedCycleId).then(newTxs => {
+          if (activeScope.type === 'PERSONAL' && selectedCycleId) {
+            TransactionService.getTransactionsForCycle(activeScope, selectedCycleId).then(newTxs => {
               setTransactions(newTxs);
               if (selectedTxInfo) {
                 const updatedTx = newTxs.find(t => t.transactionId === selectedTxInfo.tx.transactionId);

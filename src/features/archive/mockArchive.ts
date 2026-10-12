@@ -2,13 +2,17 @@ import { collection, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { FinancialCycle } from '../../services/financialCycle.service';
 import { DailyJournal } from '../../services/dailyJournal.service';
+import { FinancialScope, getScopePath } from '../../types/FinancialScope';
 
-export async function createMockArchive(userId: string) {
+export async function createMockArchive(scopeOrUserId: FinancialScope | string) {
+  const scope: FinancialScope = typeof scopeOrUserId === 'string'
+    ? { type: 'PERSONAL', id: scopeOrUserId }
+    : scopeOrUserId;
   const batch = writeBatch(db);
   const now = new Date();
   
   const cycleId = 'cycle_mock_2026_07';
-  const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+  const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
   
   const startDate = new Date(2026, 6, 15); // July 15
   const endDate = new Date(2026, 7, 14); // Aug 14
@@ -49,7 +53,7 @@ export async function createMockArchive(userId: string) {
 
   for (const day of mockDays) {
     const journalId = `journal_${day.fullDate.replace(/-/g, '_')}`;
-    const journalRef = doc(db, 'users', userId, 'financialCycles', cycleId, 'dailyJournals', journalId);
+    const journalRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId, 'dailyJournals', journalId);
     
     const d = new Date(`${day.fullDate}T12:00:00Z`);
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

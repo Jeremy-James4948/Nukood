@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../lib/firebase';
 import { Drawer } from 'vaul';
 import {
   ChevronLeft,
@@ -57,7 +59,7 @@ export function AddTransactionDrawer({
   const [manualShares, setManualShares] = useState<Record<string, string>>({});
 
   
-  const { settings, categories, templates, fastEntries, activeCycle, userId, refreshCycle, refreshTransactions, refreshFastEntries } = useFinancialEngine();
+  const { settings, categories, templates, fastEntries, activeCycle, userId, refreshCycle, refreshTransactions, refreshFastEntries, activeScope } = useFinancialEngine();
   const { currencySymbol } = useCurrencyFormatter();
 
   useEffect(() => {
@@ -140,8 +142,7 @@ export function AddTransactionDrawer({
       }
 
       // 2. Automatically create the new transaction using the historical data
-      await TransactionService.createTransaction(
-        userId,
+      await TransactionService.createTransaction({ type: 'PERSONAL', id: userId },
         activeCycle.cycleId,
         {
           categoryId: sourceTx.categoryId,
@@ -241,8 +242,14 @@ export function AddTransactionDrawer({
       const txDate = new Date(date);
       
       if (editTransaction) {
-        await TransactionService.updateTransaction(
-          userId,
+        if (activeScope.type === 'GROUP') {
+           // Not yet supported in edit for groups
+           toast.error("Editing group transactions is not supported yet.");
+           setIsSaving(false);
+           return;
+        }
+
+        await TransactionService.updateTransaction({ type: 'PERSONAL', id: userId },
           editTransaction.cycleId || activeCycle.cycleId,
           editTransaction,
           {
@@ -285,7 +292,7 @@ export function AddTransactionDrawer({
           let finalReceiptUrl = receiptFile ? (receiptFile as any).url : undefined;
           if (receiptFile && !finalReceiptUrl) {
             // Upload receipt for split
-            const metadata = await ReceiptService.uploadReceipt(userId, 'split_' + Date.now(), 'global_receipt', receiptFile);
+            const metadata = await ReceiptService.uploadReceipt({ type: 'PERSONAL', id: userId }, 'split_' + Date.now(), 'global_receipt', receiptFile);
             finalReceiptUrl = metadata.url;
           }
 
@@ -303,22 +310,50 @@ export function AddTransactionDrawer({
           });
           toast.success("Expense split successfully!");
         } else {
-          await TransactionService.createTransaction(
-            userId,
-            activeCycle.cycleId,
-            {
+          if (activeScope.type === 'GROUP') {
+            if (splitEnabled) {
+              toast.error("Split expense is not available for groups yet.");
+              setIsSaving(false);
+              return;
+            }
+
+            let finalReceiptUrl = receiptFile ? (receiptFile as any).url : undefined;
+            if (receiptFile && !finalReceiptUrl) {
+              const metadata = await ReceiptService.uploadReceipt(activeScope, 'grp_' + Date.now(), 'global_receipt', receiptFile);
+              finalReceiptUrl = metadata.url;
+            }
+
+            const createGroupTransaction = httpsCallable(functions, 'groupTransaction');
+            await createGroupTransaction({
+              groupId: activeScope.id,
               categoryId: activeCategory.categoryId,
               templateId: template?.templateId || 'none',
               transactionType: isIncome ? 'INCOME' : 'EXPENSE',
               title: finalTitle,
               amount: finalAmount,
-              date: txDate,
+              date: txDate.toISOString(),
               note: note.trim() || undefined,
-              transactionDetails: formData
-            },
-            saveAsFastEntry,
-            receiptFile
-          );
+              transactionDetails: formData,
+              receiptUrl: finalReceiptUrl,
+              timezoneOffset: new Date().getTimezoneOffset()
+            });
+          } else {
+            await TransactionService.createTransaction({ type: 'PERSONAL', id: userId },
+              activeCycle.cycleId,
+              {
+                categoryId: activeCategory.categoryId,
+                templateId: template?.templateId || 'none',
+                transactionType: isIncome ? 'INCOME' : 'EXPENSE',
+                title: finalTitle,
+                amount: finalAmount,
+                date: txDate,
+                note: note.trim() || undefined,
+                transactionDetails: formData
+              },
+              saveAsFastEntry,
+              receiptFile
+            );
+          }
         }
       }
       
@@ -599,7 +634,7 @@ export function AddTransactionDrawer({
                   </div>
                   
                   {/* Split Expense Toggle */}
-                  {!editTransaction && activeCategory.type !== 'INCOME' && (
+                  {!editTransaction && activeCategory.type !== 'INCOME' && activeScope.type !== 'GROUP' && (
                     <div className="bg-card rounded-[24px] p-5 shadow-neu-extrude border border-primary/5 flex flex-col gap-4">
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-1">
@@ -756,7 +791,7 @@ export function AddTransactionDrawer({
                   )}
 
                   {/* Save as Fast Entry Toggle (Only when creating) */}
-                  {!editTransaction && (
+                  {!editTransaction && activeScope.type !== 'GROUP' && (
                     <div className="bg-card rounded-[24px] p-5 shadow-neu-extrude border border-primary/5 flex items-center justify-between">
                       <div className="flex flex-col gap-1">
                         <span className="text-[15px] font-bold text-foreground">Save as Fast Entry</span>

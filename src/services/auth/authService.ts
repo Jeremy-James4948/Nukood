@@ -1,10 +1,8 @@
 import { AuthProvider, AuthUser } from '../../types/auth';
-import { DevelopmentAuthProvider } from './developmentAuthProvider';
+import { FirebaseAuthProvider } from './firebaseAuthProvider';
 
-// We instantiate the development provider here.
-// In the future, this can be swapped with a FirebaseAuthProvider 
-// without changing the rest of the application.
-const provider: AuthProvider = new DevelopmentAuthProvider();
+// We instantiate the firebase provider here.
+const provider: AuthProvider = new FirebaseAuthProvider();
 
 export const AuthService = {
   signIn: (identifier: string, password: string) => provider.signIn(identifier, password),

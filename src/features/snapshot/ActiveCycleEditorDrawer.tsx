@@ -10,7 +10,7 @@ interface ActiveCycleEditorDrawerProps {
 }
 
 export function ActiveCycleEditorDrawer({ isOpen, onClose }: ActiveCycleEditorDrawerProps) {
-  const { activeCycle, userId, settings, transactions, refreshCycle } = useFinancialEngine();
+  const { activeCycle, userId, settings, transactions, refreshCycle, activeScope } = useFinancialEngine();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formatDateForInput = (date: Date) => {
@@ -46,8 +46,7 @@ export function ActiveCycleEditorDrawer({ isOpen, onClose }: ActiveCycleEditorDr
             return;
           }
           
-          await FinancialCycleService.splitCycleAtDate(
-            userId,
+          await FinancialCycleService.splitCycleAtDate(activeScope,
             activeCycle,
             newEndDate,
             transactionsAfter,
@@ -61,7 +60,7 @@ export function ActiveCycleEditorDrawer({ isOpen, onClose }: ActiveCycleEditorDr
       }
 
       // If no split is needed (or we are stretching it), just update the active cycle directly
-      await FinancialCycleService.updateCycleEndDate(userId, activeCycle.cycleId, newEndDate);
+      await FinancialCycleService.updateCycleEndDate({ type: 'PERSONAL', id: userId }, activeCycle.cycleId, newEndDate);
       await refreshCycle();
       onClose();
 

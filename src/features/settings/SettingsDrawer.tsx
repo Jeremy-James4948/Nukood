@@ -76,7 +76,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
             // Gap detected — stretch the current cycle to cover it.
             const gapFilledEnd = new Date(newStartDate);
             gapFilledEnd.setDate(gapFilledEnd.getDate() - 1);
-            await FinancialCycleService.updateCycleEndDate(userId, activeCycle.cycleId, gapFilledEnd);
+            await FinancialCycleService.updateCycleEndDate({ type: 'PERSONAL', id: userId }, activeCycle.cycleId, gapFilledEnd);
             await refreshCycle();
           }
         }
@@ -124,7 +124,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         updates[editingConfig.key] = val;
       }
 
-      await FinancialSettingsService.updateSettings(userId, updates);
+      await FinancialSettingsService.updateSettings({ type: 'PERSONAL', id: userId }, updates);
       await refreshSettings();
     } catch (err) {
       console.error(err);

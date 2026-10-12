@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingBag, MoreHorizontal, Wallet, PieChart, Edit2 } from 'lucide-react';
+import { ShoppingBag, MoreHorizontal, Wallet, PieChart, Edit2, Users } from 'lucide-react';
 import { CATEGORY_COLORS } from '../../constants';
 import { BudgetHealthDrawer } from './BudgetHealthDrawer';
 import { ActiveCycleEditorDrawer } from './ActiveCycleEditorDrawer';
@@ -9,13 +9,25 @@ import { FinancialEngine } from '../../utils/FinancialEngine';
 import { Category } from '../../services/category.service';
 import { IconMap } from '../../constants/icons';
 import { useCurrencyFormatter } from '../../utils/currency';
+import { Group, GroupService } from '../../services/group.service';
+import { GroupMembersDrawer } from '../groups/GroupMembersDrawer';
 
 export function SnapshotWidget() {
   const { formatAmount, formatNumber, currencySymbol } = useCurrencyFormatter();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isHealthOpen, setIsHealthOpen] = useState(false);
   const [isCycleEditorOpen, setIsCycleEditorOpen] = useState(false);
-  const { activeCycle, settings, categories: dbCategories, isLoading, transactions } = useFinancialEngine();
+  const [isMembersOpen, setIsMembersOpen] = useState(false);
+  const { activeScope, activeCycle, settings, categories: dbCategories, isLoading, transactions } = useFinancialEngine();
+  const [activeGroup, setActiveGroup] = useState<Group | null>(null);
+
+  useEffect(() => {
+    if (activeScope.type === 'GROUP') {
+      GroupService.getGroup(activeScope.id).then(setActiveGroup).catch(console.error);
+    } else {
+      setActiveGroup(null);
+    }
+  }, [activeScope]);
 
   useEffect(() => {
     if (activeCategory) {
@@ -113,6 +125,20 @@ export function SnapshotWidget() {
             <Edit2 size={12} strokeWidth={2.5} className="opacity-50 group-hover:opacity-100" />
           </div>
         </button>
+
+        {activeScope.type === 'GROUP' && activeGroup && (
+          <div className="flex flex-col items-center mb-6">
+            <h2 className="text-2xl font-bold text-foreground">{activeGroup.name}</h2>
+            <button
+              onClick={() => setIsMembersOpen(true)}
+              className="flex items-center gap-1.5 text-muted-foreground hover:text-accent mt-1 bg-muted/50 hover:bg-muted px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer active:scale-95"
+              aria-label="View group members"
+            >
+               <Users size={12} />
+               <span>{activeGroup.memberIds.length} Members</span>
+            </button>
+          </div>
+        )}
 
         <span className="text-[13px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4">Remaining Balance</span>
         <div className="flex items-start text-foreground">
@@ -267,6 +293,13 @@ export function SnapshotWidget() {
 
       <BudgetHealthDrawer isOpen={isHealthOpen} onClose={() => setIsHealthOpen(false)} stats={budgetStats} />
       <ActiveCycleEditorDrawer isOpen={isCycleEditorOpen} onClose={() => setIsCycleEditorOpen(false)} />
+      {activeScope.type === 'GROUP' && (
+        <GroupMembersDrawer
+          isOpen={isMembersOpen}
+          onClose={() => setIsMembersOpen(false)}
+          groupId={activeScope.id}
+        />
+      )}
     </section>
   );
 }

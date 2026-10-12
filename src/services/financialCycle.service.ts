@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, setDoc, query, where, limit, Timestamp, writeBatch, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { FinancialScope, getScopePath } from '../types/FinancialScope';
 import { FinancialSettings, FinancialSettingsService } from './financialSettings.service';
 import { Transaction } from './transaction.service';
 
@@ -32,8 +33,8 @@ export class FinancialCycleService {
   /**
    * Fetches the currently ACTIVE financial cycle for the user.
    */
-  static async getActiveCycle(userId: string): Promise<FinancialCycle | null> {
-    const cyclesRef = collection(db, 'users', userId, 'financialCycles');
+  static async getActiveCycle(scope: FinancialScope): Promise<FinancialCycle | null> {
+    const cyclesRef = collection(db, ...getScopePath(scope), 'financialCycles');
     const q = query(cyclesRef, where('status', '==', 'ACTIVE'), limit(1));
     const snap = await getDocs(q);
 
@@ -47,8 +48,8 @@ export class FinancialCycleService {
   /**
    * Fetches the most recent completed cycle to calculate Carry Forward.
    */
-  static async getPreviousCycle(userId: string): Promise<FinancialCycle | null> {
-    const cyclesRef = collection(db, 'users', userId, 'financialCycles');
+  static async getPreviousCycle(scope: FinancialScope): Promise<FinancialCycle | null> {
+    const cyclesRef = collection(db, ...getScopePath(scope), 'financialCycles');
     // We avoid orderBy here because it requires a composite index in Firestore
     const q = query(cyclesRef, where('status', '==', 'COMPLETED'));
     const snap = await getDocs(q);
@@ -64,14 +65,14 @@ export class FinancialCycleService {
   /**
    * Fetches all cycles (ACTIVE and COMPLETED), ordered newest to oldest.
    */
-  static async getAllCycles(userId: string): Promise<FinancialCycle[]> {
-    const cyclesRef = collection(db, 'users', userId, 'financialCycles');
+  static async getAllCycles(scope: FinancialScope): Promise<FinancialCycle[]> {
+    const cyclesRef = collection(db, ...getScopePath(scope), 'financialCycles');
     const snap = await getDocs(cyclesRef);
 
     if (snap.empty) return [];
 
     let cycles = snap.docs.map(doc => this.mapToCycle(doc.id, doc.data()));
-    cycles = cycles.filter(c => c.status === 'ACTIVE' || c.status === 'COMPLETED');
+    cycles = cycles.filter(c => c.status === 'ACTIVE' || c.status === 'COMPLETED' || c.status === 'ARCHIVED');
     cycles.sort((a, b) => b.endDate.getTime() - a.endDate.getTime());
 
     return cycles;
@@ -82,13 +83,13 @@ export class FinancialCycleService {
    * VERY IMPORTANT: Handles strict date boundaries and carry forward calculation.
    */
   static async createNewCycle(
-    userId: string,
+    scope: FinancialScope,
     settings: FinancialSettings,
     cycleName: string,
     providedPreviousCycle?: FinancialCycle | null
   ): Promise<FinancialCycle> {
 
-    const previousCycle = providedPreviousCycle || await this.getPreviousCycle(userId);
+    const previousCycle = providedPreviousCycle || await this.getPreviousCycle(scope);
     let carryForward = 0;
 
     if (settings.carryForwardEnabled && previousCycle) {
@@ -127,7 +128,7 @@ export class FinancialCycleService {
     endDate.setHours(23, 59, 59, 999);
 
     const cycleId = `cycle_${startDate.getFullYear()}_${(startDate.getMonth() + 1).toString().padStart(2, '0')}_${startDate.getDate().toString().padStart(2, '0')}`;
-    const docRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+    const docRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
 
     // Initialize categorySummary with all default categories
     const allCategories = await CategoryService.getAllCategories();
@@ -170,7 +171,7 @@ export class FinancialCycleService {
     } as FinancialCycle;
   }
 
-  private static mapToCycle(id: string, data: any): FinancialCycle {
+  static mapToCycle(id: string, data: any): FinancialCycle {
 
     // Map timestamps in categorySummary
     const mappedCategorySummary = data.categorySummary ? { ...data.categorySummary } : undefined;
@@ -199,8 +200,8 @@ export class FinancialCycleService {
   /**
    * Temporary helper to forcefully set the active cycle budget to 15000.
    */
-  static async setTemporaryBudget(userId: string, cycleId: string, budget: number): Promise<void> {
-    const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+  static async setTemporaryBudget(scope: FinancialScope, cycleId: string, budget: number): Promise<void> {
+    const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
     const snap = await getDoc(cycleRef);
     if (snap.exists()) {
       const data = snap.data();
@@ -221,8 +222,8 @@ export class FinancialCycleService {
    * Updates the end date of a financial cycle and recalculates its cycleLengthDays.
    * Safe to call on the active cycle when the user adjusts the cycle's end date in settings.
    */
-  static async updateCycleEndDate(userId: string, cycleId: string, newEndDate: Date): Promise<void> {
-    const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+  static async updateCycleEndDate(scope: FinancialScope, cycleId: string, newEndDate: Date): Promise<void> {
+    const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
     const snap = await getDoc(cycleRef);
     if (!snap.exists()) throw new Error(`Cycle ${cycleId} not found.`);
 
@@ -252,7 +253,7 @@ export class FinancialCycleService {
    * Updates both start and end dates of a cycle (used for archive historical corrections).
    * Recalculates cycleLengthDays from the new boundaries.
    */
-  static async updateCycleDates(userId: string, cycleId: string, newStartDate: Date, newEndDate: Date): Promise<void> {
+  static async updateCycleDates(scope: FinancialScope, cycleId: string, newStartDate: Date, newEndDate: Date): Promise<void> {
     const normalizedStart = new Date(newStartDate);
     normalizedStart.setHours(0, 0, 0, 0);
     const normalizedEnd = new Date(newEndDate);
@@ -261,7 +262,7 @@ export class FinancialCycleService {
     const diffMs = normalizedEnd.getTime() - normalizedStart.getTime();
     const cycleLengthDays = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1);
 
-    const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+    const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
     await setDoc(cycleRef, {
       startDate: Timestamp.fromDate(normalizedStart),
       endDate: Timestamp.fromDate(normalizedEnd),
@@ -283,7 +284,7 @@ export class FinancialCycleService {
    * Everything is executed in a single atomic batch write.
    */
   static async splitCycleAtDate(
-    userId: string,
+    scope: FinancialScope,
     activeCycle: FinancialCycle,
     newEndDate: Date,
     overflowTransactions: Array<{
@@ -301,7 +302,7 @@ export class FinancialCycleService {
     normalizedEnd.setHours(23, 59, 59, 999);
 
     // --- Fetch overflow journal docs (stored as a subcollection on the old cycle) ---
-    const journalsRef = collection(db, 'users', userId, 'financialCycles', activeCycle.cycleId, 'dailyJournals');
+    const journalsRef = collection(db, ...getScopePath(scope), 'financialCycles', activeCycle.cycleId, 'dailyJournals');
     const journalsSnap = await getDocs(journalsRef);
     const overflowJournalDocs = journalsSnap.docs.filter(jDoc => {
       const jDate = jDoc.data().date?.toDate();
@@ -324,7 +325,10 @@ export class FinancialCycleService {
       .reduce((sum, tx) => sum + tx.amount, 0);
 
     // --- Carry-forward from trimmed old cycle ---
-    const oldRemaining = activeCycle.budgetSnapshot.availableBalance - (activeCycle.totalSpent - overflowExpenseTotal);
+    // When overflow income is moved to the new cycle, it must be deducted from the old cycle's availableBalance
+    // so that it is not counted both in oldRemaining (which feeds carryForward) and in new cycle's availableBalance.
+    const trimmedOldAvailableBalance = activeCycle.budgetSnapshot.availableBalance - overflowIncomeTotal;
+    const oldRemaining = trimmedOldAvailableBalance - (activeCycle.totalSpent - overflowExpenseTotal);
     const carryForward = settings.carryForwardEnabled ? Math.max(0, oldRemaining) : 0;
 
     // --- New cycle dates ---
@@ -357,11 +361,12 @@ export class FinancialCycleService {
     const now = Timestamp.now();
 
     // 1. Trim old cycle and mark it COMPLETED
-    const oldCycleRef = doc(db, 'users', userId, 'financialCycles', activeCycle.cycleId);
+    const oldCycleRef = doc(db, ...getScopePath(scope), 'financialCycles', activeCycle.cycleId);
     const oldCycleUpdates: any = {
       endDate: Timestamp.fromDate(normalizedEnd),
       cycleLengthDays: oldCycleLength,
       status: 'COMPLETED',
+      'budgetSnapshot.availableBalance': increment(-overflowIncomeTotal),
       totalSpent: increment(-overflowExpenseTotal),
       transactionCount: increment(-overflowTransactions.length),
       updatedAt: now
@@ -376,7 +381,7 @@ export class FinancialCycleService {
     batch.update(oldCycleRef, oldCycleUpdates);
 
     // 2. Create the new ACTIVE cycle
-    const newCycleRef = doc(db, 'users', userId, 'financialCycles', newCycleId);
+    const newCycleRef = doc(db, ...getScopePath(scope), 'financialCycles', newCycleId);
     batch.set(newCycleRef, {
       cycleName: newCycleName,
       startDate: Timestamp.fromDate(newCycleStart),
@@ -397,14 +402,14 @@ export class FinancialCycleService {
 
     // 3. Re-assign overflow transactions to the new cycle
     for (const tx of overflowTransactions) {
-      const txRef = doc(db, 'users', userId, 'transactions', tx.transactionId);
+      const txRef = doc(db, ...getScopePath(scope), 'transactions', tx.transactionId);
       batch.update(txRef, { cycleId: newCycleId, updatedAt: now });
     }
 
     // 4. Relocate overflow journal documents: delete from old cycle, create in new cycle
     for (const jDoc of overflowJournalDocs) {
       batch.delete(jDoc.ref);
-      const newJournalRef = doc(db, 'users', userId, 'financialCycles', newCycleId, 'dailyJournals', jDoc.id);
+      const newJournalRef = doc(db, ...getScopePath(scope), 'financialCycles', newCycleId, 'dailyJournals', jDoc.id);
       batch.set(newJournalRef, { ...jDoc.data(), cycleId: newCycleId });
     }
 
@@ -435,8 +440,8 @@ export class FinancialCycleService {
    * Should be called before creating a new cycle so carry-forward
    * calculation in createNewCycle picks it up via getPreviousCycle.
    */
-  static async completeCycle(userId: string, cycleId: string): Promise<void> {
-    const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+  static async completeCycle(scope: FinancialScope, cycleId: string): Promise<void> {
+    const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
     await setDoc(cycleRef, {
       status: 'COMPLETED',
       updatedAt: Timestamp.now()
@@ -446,8 +451,8 @@ export class FinancialCycleService {
   /**
    * Updates the cycleName for a specific Financial Cycle.
    */
-  static async updateCycleName(userId: string, cycleId: string, newName: string): Promise<void> {
-    const cycleRef = doc(db, 'users', userId, 'financialCycles', cycleId);
+  static async updateCycleName(scope: FinancialScope, cycleId: string, newName: string): Promise<void> {
+    const cycleRef = doc(db, ...getScopePath(scope), 'financialCycles', cycleId);
     await setDoc(cycleRef, {
       cycleName: newName,
       updatedAt: Timestamp.now()
@@ -458,11 +463,11 @@ export class FinancialCycleService {
    * Cascades carry-forward recalculations chronologically across cycles.
    * Starts from startingCycleId and updates all subsequent cycles.
    */
-  static async cascadeCarryForward(userId: string, startingCycleId: string): Promise<void> {
-    const settings = await FinancialSettingsService.getSettings(userId);
+  static async cascadeCarryForward(scope: FinancialScope, startingCycleId: string): Promise<void> {
+    const settings = await FinancialSettingsService.getSettings(scope);
     if (!settings) return;
 
-    const cyclesRef = collection(db, 'users', userId, 'financialCycles');
+    const cyclesRef = collection(db, ...getScopePath(scope), 'financialCycles');
     const snap = await getDocs(cyclesRef);
 
     // Parse and sort chronologically
@@ -512,16 +517,16 @@ export class FinancialCycleService {
    * from the transactions collection.
    */
   static async rebalanceCyclesAfterDateChange(
-    userId: string,
+    scope: FinancialScope,
     cycleId: string,
     newStartDate: Date,
     newEndDate: Date
   ): Promise<void> {
     // 1. Update the cycle's boundaries
-    await this.updateCycleDates(userId, cycleId, newStartDate, newEndDate);
+    await this.updateCycleDates(scope, cycleId, newStartDate, newEndDate);
 
     // 2. Fetch all cycles sorted chronologically
-    const cyclesRef = collection(db, 'users', userId, 'financialCycles');
+    const cyclesRef = collection(db, ...getScopePath(scope), 'financialCycles');
     const cyclesSnap = await getDocs(cyclesRef);
     const cycles = cyclesSnap.docs.map(doc => {
       const data = doc.data();
@@ -538,7 +543,7 @@ export class FinancialCycleService {
     }).sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
     // 3. Fetch all transactions
-    const txRef = collection(db, 'users', userId, 'transactions');
+    const txRef = collection(db, ...getScopePath(scope), 'transactions');
     const txSnap = await getDocs(txRef);
     const transactions = txSnap.docs.map(d => ({ id: d.id, ref: d.ref, ...(d.data() as any) }));
 
@@ -624,7 +629,7 @@ export class FinancialCycleService {
       // setting them will overwrite perfectly. To be 100% clean, we could delete existing first,
       // but overwrite is fine.
       for (const jId of Object.keys(cycle.dailyJournals)) {
-        const jRef = doc(db, 'users', userId, 'financialCycles', cycle.id, 'dailyJournals', jId);
+        const jRef = doc(db, ...getScopePath(scope), 'financialCycles', cycle.id, 'dailyJournals', jId);
         batch.set(jRef, {
           ...cycle.dailyJournals[jId],
           createdAt: Timestamp.now(), // approximation
@@ -641,7 +646,7 @@ export class FinancialCycleService {
 
     // 6. Cascade carry-forwards starting from the earliest cycle
     if (cycles.length > 0) {
-      await this.cascadeCarryForward(userId, cycles[0].id);
+      await this.cascadeCarryForward(scope, cycles[0].id);
     }
   }
 }

@@ -11,15 +11,20 @@ import {
   Coffee,
   Film,
   Train,
-  ChevronDown
+  ChevronDown,
+  Receipt
 } from 'lucide-react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { CATEGORY_COLORS, CATEGORY_DEF } from '../../constants';
 import { useCurrencyFormatter } from '../../utils/currency';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
 import { FinancialCycleService, FinancialCycle } from '../../services/financialCycle.service';
 import { DailyJournalService, DailyJournal } from '../../services/dailyJournal.service';
 import { TransactionService, Transaction } from '../../services/transaction.service';
-import { createMockArchive } from './mockArchive';
+import { Category } from '../../services/category.service';
+import { FinancialScope, getScopePath } from '../../types/FinancialScope';
+import { TransactionDetailDrawer } from '../transactions/TransactionDetailDrawer';
 
 const IconMap: Record<string, any> = {
   ShoppingBag, Coffee, Film, Train
@@ -62,20 +67,31 @@ function AnimatedCounter({ value, symbol }: { value: number, symbol: string }) {
   );
 }
 
-export function ArchiveView() {
+interface ArchiveViewProps {
+  scope?: FinancialScope;
+}
+
+export function ArchiveView({ scope }: ArchiveViewProps = {}) {
   const { formatAmount, formatNumber, currencySymbol } = useCurrencyFormatter();
-  const { userId, categories: globalCategories } = useFinancialEngine();
+  const { activeScope, userId, categories: globalCategories } = useFinancialEngine();
+  const currentScope: FinancialScope = scope || activeScope || { type: 'PERSONAL', id: userId };
   
   const [completedCycles, setCompletedCycles] = useState<FinancialCycle[]>([]);
   const [currentCycleIndex, setCurrentCycleIndex] = useState(0);
   const [dailyJournals, setDailyJournals] = useState<DailyJournal[]>([]);
   const [cycleTransactions, setCycleTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isJournalsLoading, setIsJournalsLoading] = useState(false);
   
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [isDetailedOpen, setIsDetailedOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isFetchingTxs, setIsFetchingTxs] = useState(false);
+  const [selectedTxInfo, setSelectedTxInfo] = useState<{
+    tx: Transaction;
+    category?: Category;
+    cycleName?: string;
+  } | null>(null);
   
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
@@ -85,38 +101,207 @@ export function ArchiveView() {
   const [editEndValue, setEditEndValue] = useState('');
   const [showDateConfirm, setShowDateConfirm] = useState(false);
 
-  // Fetch cycles on mount
+  // Real-time synchronization of transactions and cycles for currentScope
   useEffect(() => {
-    async function loadCycles() {
-      setIsLoading(true);
-      try {
-        const cycles = await FinancialCycleService.getAllCycles(userId);
-        setCompletedCycles(cycles);
-      } catch (err) {
-        console.error("Error loading completed cycles:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadCycles();
-  }, [userId]);
+    let isCurrent = true;
 
-  // Fetch journals when cycle changes
-  useEffect(() => {
-    async function loadJournals() {
-      if (completedCycles.length === 0) return;
-      const cycle = completedCycles[currentCycleIndex];
-      try {
-        const journals = await DailyJournalService.getDailyJournalsForCycle(userId, cycle.cycleId);
-        setDailyJournals(journals);
-        setCycleTransactions([]); // clear previous cycle's transactions
-        setSelectedDates([]); // clear selection
-      } catch (err) {
-        console.error("Error loading daily journals:", err);
-      }
+    // Immediately reset state on scope switch to prevent data leakage/stale rendering
+    setCompletedCycles([]);
+    setCurrentCycleIndex(0);
+    setDailyJournals([]);
+    setCycleTransactions([]);
+    setSelectedDates([]);
+    setSelectedTxInfo(null);
+    setIsDrawerOpen(false);
+    setIsDetailedOpen(false);
+
+    if (!currentScope.id) {
+      setIsLoading(false);
+      return;
     }
-    loadJournals();
-  }, [userId, currentCycleIndex, completedCycles]);
+
+    setIsLoading(true);
+
+    const scopePath = getScopePath(currentScope);
+    const txsRef = collection(db, ...scopePath, 'transactions');
+    const cyclesRef = collection(db, ...scopePath, 'financialCycles');
+
+    let allRawTransactions: Transaction[] = [];
+    let allRawCycles: FinancialCycle[] = [];
+    let txsReceived = false;
+    let cyclesReceived = false;
+
+    const computeLiveCycles = () => {
+      if (!isCurrent || !txsReceived || !cyclesReceived) return;
+
+      // Group transactions by cycleId
+      const cycleTxCounts = new Map<string, number>();
+      for (const tx of allRawTransactions) {
+        if (tx.cycleId) {
+          cycleTxCounts.set(tx.cycleId, (cycleTxCounts.get(tx.cycleId) || 0) + 1);
+        }
+      }
+
+      // Filter: cycle must contain at least 1 actual transaction (whether ACTIVE, COMPLETED, or ARCHIVED)
+      const eligible = allRawCycles
+        .filter(c => (cycleTxCounts.get(c.cycleId) || 0) > 0)
+        .sort((a, b) => b.endDate.getTime() - a.endDate.getTime());
+
+      setCompletedCycles(eligible);
+      setCurrentCycleIndex(prev => (prev >= eligible.length ? Math.max(0, eligible.length - 1) : prev));
+      setIsLoading(false);
+    };
+
+    // 1. Subscribe to all transactions in this scope
+    const unsubTxs = onSnapshot(txsRef, (snap) => {
+      if (!isCurrent) return;
+      allRawTransactions = snap.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          transactionId: data.transactionId || doc.id,
+          date: data.date?.toDate ? data.date.toDate() : (data.date ? new Date(data.date) : new Date()),
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+        } as Transaction;
+      });
+      txsReceived = true;
+      computeLiveCycles();
+    }, (err) => {
+      console.error("Error listening to transactions:", err);
+      if (isCurrent) setIsLoading(false);
+    });
+
+    // 2. Subscribe to all financial cycles in this scope
+    const unsubCycles = onSnapshot(cyclesRef, (snap) => {
+      if (!isCurrent) return;
+      allRawCycles = snap.docs.map(doc => FinancialCycleService.mapToCycle(doc.id, doc.data()));
+      cyclesReceived = true;
+      computeLiveCycles();
+    }, (err) => {
+      console.error("Error listening to financial cycles:", err);
+      if (isCurrent) setIsLoading(false);
+    });
+
+    return () => {
+      isCurrent = false;
+      unsubTxs();
+      unsubCycles();
+    };
+  }, [currentScope.type, currentScope.id]);
+
+  // Real-time synchronization of journals for the currently selected cycle
+  useEffect(() => {
+    let isCurrent = true;
+
+    // Clear journal and date state when cycle changes
+    setDailyJournals([]);
+    setCycleTransactions([]);
+    setSelectedDates([]);
+    setSelectedTxInfo(null);
+    setIsDrawerOpen(false);
+    setIsDetailedOpen(false);
+
+    if (completedCycles.length === 0 || !currentScope.id) {
+      setIsJournalsLoading(false);
+      return;
+    }
+
+    const currentCycle = completedCycles[currentCycleIndex];
+    if (!currentCycle) {
+      setIsJournalsLoading(false);
+      return;
+    }
+
+    setIsJournalsLoading(true);
+
+    const scopePath = getScopePath(currentScope);
+    const journalsRef = collection(db, ...scopePath, 'financialCycles', currentCycle.cycleId, 'dailyJournals');
+
+    const unsubJournals = onSnapshot(journalsRef, (snap) => {
+      if (!isCurrent) return;
+      const journals = snap.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            ...data,
+            journalId: data.journalId || doc.id,
+            date: data.date?.toDate ? data.date.toDate() : (data.date ? new Date(data.date) : new Date()),
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+          } as DailyJournal;
+        })
+        // Only display journals that contain at least one transaction
+        .filter(j => j.transactionCount > 0)
+        .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+      setDailyJournals(journals);
+      setIsJournalsLoading(false);
+
+      // Clean up selectedDates that no longer exist among the journals
+      const availableFullDates = new Set(journals.map(j => formatJournalDate(j.date).fullDate));
+      setSelectedDates(prev => prev.filter(d => availableFullDates.has(d)));
+    }, (err) => {
+      console.error("Error listening to daily journals:", err);
+      if (isCurrent) setIsJournalsLoading(false);
+    });
+
+    return () => {
+      isCurrent = false;
+      unsubJournals();
+    };
+  }, [currentScope.type, currentScope.id, currentCycleIndex, completedCycles]);
+
+  // Real-time synchronization of transactions for selected journals when Drawer is open
+  useEffect(() => {
+    if (!isDrawerOpen || selectedDates.length === 0 || !currentScope.id) {
+      return;
+    }
+
+    const journalIds = Array.from(new Set(selectedDaysData.map(j => j.journalId)));
+    if (journalIds.length === 0) {
+      setCycleTransactions([]);
+      return;
+    }
+
+    const scopePath = getScopePath(currentScope);
+    const txsRef = collection(db, ...scopePath, 'transactions');
+    const journalIdSet = new Set(journalIds);
+
+    setIsFetchingTxs(true);
+    const unsubSelectedTxs = onSnapshot(txsRef, (snap) => {
+      const txs = snap.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            ...data,
+            transactionId: data.transactionId || doc.id,
+            date: data.date?.toDate ? data.date.toDate() : (data.date ? new Date(data.date) : new Date()),
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt ? new Date(data.updatedAt) : new Date()),
+          } as Transaction;
+        })
+        .filter(tx => journalIdSet.has(tx.journalId))
+        .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+      setCycleTransactions(txs);
+      setIsFetchingTxs(false);
+
+      // If a currently selected transaction was deleted, close or reset detail drawer
+      setSelectedTxInfo(prev => {
+        if (!prev) return null;
+        const exists = txs.find(t => t.transactionId === prev.tx.transactionId);
+        return exists ? { ...prev, tx: exists } : null;
+      });
+    }, (err) => {
+      console.error("Error listening to drawer transactions:", err);
+      setIsFetchingTxs(false);
+    });
+
+    return () => {
+      unsubSelectedTxs();
+    };
+  }, [isDrawerOpen, selectedDates, currentScope.type, currentScope.id]);
 
   // Reset edit state when navigating between cycles
   useEffect(() => {
@@ -138,17 +323,6 @@ export function ArchiveView() {
         <p className="text-muted-foreground mb-8 max-w-[250px]">
           When your current budget cycle ends, all your daily journals will be beautifully archived here.
         </p>
-        <button 
-          onClick={async () => {
-             setIsLoading(true);
-             await createMockArchive(userId);
-             const cycles = await FinancialCycleService.getAllCycles(userId);
-             setCompletedCycles(cycles);
-             setIsLoading(false);
-          }}
-          className="px-6 py-3 bg-primary text-white rounded-2xl font-bold shadow-neu-extrude hover:opacity-90 active:scale-95 transition-all text-sm">
-          Generate Mock Cycle (Debug)
-        </button>
       </div>
     );
   }
@@ -156,13 +330,17 @@ export function ArchiveView() {
   const cycle = completedCycles[currentCycleIndex];
 
   // Helper to format dates like "15 Jul"
-  const formatDateHeader = (d: Date) => {
+  const formatDateHeader = (d?: Date) => {
+    if (!d || !(d instanceof Date) || isNaN(d.getTime())) return '—';
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${d.getDate()} ${months[d.getMonth()]}`;
   };
 
   // Helper to format journal cards
-  const formatJournalDate = (d: Date) => {
+  const formatJournalDate = (d?: Date) => {
+    if (!d || !(d instanceof Date) || isNaN(d.getTime())) {
+      return { date: '—', month: '—', fullDate: '' };
+    }
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return {
       date: d.getDate().toString().padStart(2, '0'),
@@ -175,10 +353,13 @@ export function ArchiveView() {
   const cycleEndFormatted = formatDateHeader(cycle.endDate);
 
   // Format Date → "YYYY-MM-DD" for <input type="date">
-  const formatDateForInput = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const formatDateForInput = (d?: Date) => {
+    if (!d || !(d instanceof Date) || isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   const handleToggleDate = (fullDate: string) => {
+    if (!fullDate) return;
     setSelectedDates(prev =>
       prev.includes(fullDate)
         ? prev.filter(d => d !== fullDate)
@@ -188,15 +369,22 @@ export function ArchiveView() {
 
   const selectedDaysData = dailyJournals.filter(j => {
     const fd = formatJournalDate(j.date).fullDate;
-    return selectedDates.includes(fd);
+    return fd && selectedDates.includes(fd);
   });
   
-  const totalCombinedSpending = selectedDaysData.reduce((sum, j) => sum + j.totalSpent, 0);
+  const totalCombinedSpending = selectedDaysData.reduce((sum, j) => sum + (j.totalSpent ?? 0), 0);
   const recordedDaysCount = dailyJournals.length;
 
-  const cycleBudget = cycle.budgetSnapshot.monthlyBudget;
-  const cycleTotalExpenses = cycle.totalSpent;
-  const cycleRemaining = cycleBudget - cycleTotalExpenses;
+  // Historical cycle budget definitions:
+  // availableBalance represents the true spending power (monthlyBudget + carryForward + income).
+  // If availableBalance is missing (legacy snapshot), fall back to monthlyBudget.
+  const cycleAvailableBalance = cycle.budgetSnapshot?.availableBalance ?? cycle.budgetSnapshot?.monthlyBudget ?? 0;
+  const cycleBudget = cycle.budgetSnapshot?.monthlyBudget ?? 0;
+  const cycleTotalExpenses = cycle.totalSpent ?? 0;
+  const cycleRemaining = cycleAvailableBalance - cycleTotalExpenses;
+  const progressPercent = cycleAvailableBalance > 0
+    ? Math.min((cycleTotalExpenses / cycleAvailableBalance) * 100, 100)
+    : (cycleTotalExpenses > 0 ? 100 : 0);
 
   // Selected Transactions (only used for detailed breakdown now)
   const selectedTransactions = cycleTransactions; // We already filtered from backend!
@@ -258,7 +446,7 @@ export function ArchiveView() {
                   onChange={(e) => setEditNameValue(e.target.value)}
                   onKeyDown={async (e) => {
                     if (e.key === 'Enter' && editNameValue.trim()) {
-                      await FinancialCycleService.updateCycleName(userId, cycle.cycleId, editNameValue.trim());
+                      await FinancialCycleService.updateCycleName(currentScope, cycle.cycleId, editNameValue.trim());
                       const updated = [...completedCycles];
                       updated[currentCycleIndex] = { ...cycle, cycleName: editNameValue.trim() };
                       setCompletedCycles(updated);
@@ -313,10 +501,10 @@ export function ArchiveView() {
                       <button
                         onClick={async () => {
                           setIsLoading(true); // Rebalance might take a couple seconds
-                          await FinancialCycleService.rebalanceCyclesAfterDateChange(userId, cycle.cycleId, new Date(editStartValue), new Date(editEndValue));
+                          await FinancialCycleService.rebalanceCyclesAfterDateChange(currentScope, cycle.cycleId, new Date(editStartValue), new Date(editEndValue));
                           // Fetch everything fresh since totals and carry-forwards changed
-                          const cycles = await FinancialCycleService.getAllCycles(userId);
-                          setCompletedCycles(cycles);
+                          const cycles = await FinancialCycleService.getAllCycles(currentScope);
+                          setCompletedCycles(cycles.filter(c => c.status === 'COMPLETED' || c.status === 'ARCHIVED'));
                           setIsEditingDates(false);
                           setShowDateConfirm(false);
                           setIsLoading(false);
@@ -407,7 +595,7 @@ export function ArchiveView() {
           <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mb-5 relative z-10">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${Math.min((cycleTotalExpenses / cycleBudget) * 100, 100)}%` }}
+              animate={{ width: `${progressPercent}%` }}
               transition={{ duration: 1.2, ease: "easeOut", delay: 0.1 }}
               className={`h-full rounded-full ${cycleRemaining < 0 ? 'bg-red-500' : 'bg-accent-warm'}`}
             />
@@ -420,8 +608,12 @@ export function ArchiveView() {
               <span className="text-[16px] font-bold text-accent-warm tracking-tight">{formatAmount(cycleTotalExpenses)}</span>
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">Cycle Budget</span>
-              <span className="text-[16px] font-bold text-foreground tracking-tight">{formatAmount(cycleBudget)}</span>
+              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest mb-1">
+                {(cycle.budgetSnapshot?.carryForward && cycle.budgetSnapshot.carryForward > 0) ? 'Available Budget' : 'Cycle Budget'}
+              </span>
+              <span className="text-[16px] font-bold text-foreground tracking-tight">
+                {formatAmount(cycleAvailableBalance)}
+              </span>
             </div>
           </div>
         </div>
@@ -429,63 +621,74 @@ export function ArchiveView() {
         <p className="text-[13px] font-medium text-muted-foreground text-center px-4 -mt-2">Select one or more days to generate a cycle summary.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {dailyJournals.map((journal) => {
-          const formattedDate = formatJournalDate(journal.date);
-          const isSelected = selectedDates.includes(formattedDate.fullDate);
+      {isJournalsLoading ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <span className="text-xs font-semibold">Loading daily journals...</span>
+        </div>
+      ) : dailyJournals.length === 0 ? (
+        <div className="bg-card rounded-2xl p-6 text-center shadow-neu-outer border border-border">
+          <p className="text-sm font-medium text-muted-foreground">No daily journals recorded for this cycle.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-4">
+          {dailyJournals.map((journal) => {
+            const formattedDate = formatJournalDate(journal.date);
+            const isSelected = selectedDates.includes(formattedDate.fullDate);
 
-          let intensityClass = 'bg-card';
-          let textClass = 'text-foreground';
-          let borderClass = 'border-transparent shadow-[0_4px_16px_-4px_rgba(0,0,0,0.04)]';
+            let intensityClass = 'bg-card';
+            let textClass = 'text-foreground';
+            let borderClass = 'border-transparent shadow-[0_4px_16px_-4px_rgba(0,0,0,0.04)]';
 
-          if (journal.totalSpent > 500) {
-            intensityClass = 'bg-accent-warm/15';
-            textClass = 'text-accent-deep';
-          } else if (journal.totalSpent > 200) {
-            intensityClass = 'bg-accent-soft/20';
-            textClass = 'text-accent-warm';
-          } else if (journal.totalSpent > 0) {
-            intensityClass = 'bg-primary/5';
-            textClass = 'text-foreground';
-          } else {
-            intensityClass = 'bg-muted/50 opacity-60';
-            textClass = 'text-gray-400';
-            borderClass = 'border-transparent shadow-none';
-          }
+            if (journal.totalSpent > 500) {
+              intensityClass = 'bg-accent-warm/15';
+              textClass = 'text-accent-deep';
+            } else if (journal.totalSpent > 200) {
+              intensityClass = 'bg-accent-soft/20';
+              textClass = 'text-accent-warm';
+            } else if (journal.totalSpent > 0) {
+              intensityClass = 'bg-primary/5';
+              textClass = 'text-foreground';
+            } else {
+              intensityClass = 'bg-muted/50 opacity-60';
+              textClass = 'text-gray-400';
+              borderClass = 'border-transparent shadow-none';
+            }
 
-          if (isSelected) {
-            intensityClass = 'bg-primary';
-            textClass = 'text-white';
-            borderClass = 'border-accent-soft/30 shadow-neu-card ring-2 ring-primary/20';
-          }
+            if (isSelected) {
+              intensityClass = 'bg-primary';
+              textClass = 'text-white';
+              borderClass = 'border-accent-soft/30 shadow-neu-card ring-2 ring-primary/20';
+            }
 
-          return (
-            <motion.button
-              key={journal.journalId}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleToggleDate(formattedDate.fullDate)}
-              className={`
-                aspect-square rounded-[24px] flex flex-col items-center justify-center
-                transition-all duration-300 relative border overflow-hidden
-                ${intensityClass} ${textClass} ${borderClass}
-              `}
-            >
-              <span className="text-[28px] font-bold tracking-tighter leading-none mb-1">
-                {formattedDate.date}
-              </span>
-              <span className={`text-[11px] font-bold uppercase tracking-widest ${isSelected ? 'text-white/60' : 'opacity-50'}`}>
-                {formattedDate.month}
-              </span>
+            return (
+              <motion.button
+                key={journal.journalId}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleToggleDate(formattedDate.fullDate)}
+                className={`
+                  aspect-square rounded-[24px] flex flex-col items-center justify-center
+                  transition-all duration-300 relative border overflow-hidden
+                  ${intensityClass} ${textClass} ${borderClass}
+                `}
+              >
+                <span className="text-[28px] font-bold tracking-tighter leading-none mb-1">
+                  {formattedDate.date}
+                </span>
+                <span className={`text-[11px] font-bold uppercase tracking-widest ${isSelected ? 'text-white/60' : 'opacity-50'}`}>
+                  {formattedDate.month}
+                </span>
 
-              {isSelected && (
-                <div className="absolute top-3 right-3">
-                  <Check size={14} className="text-white" strokeWidth={3} />
-                </div>
-              )}
-            </motion.button>
-          );
-        })}
-      </div>
+                {isSelected && (
+                  <div className="absolute top-3 right-3">
+                    <Check size={14} className="text-white" strokeWidth={3} />
+                  </div>
+                )}
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Floating Generate Summary Button */}
       <AnimatePresence>
@@ -499,22 +702,11 @@ export function ArchiveView() {
           >
             <Drawer.Root
               open={isDrawerOpen}
-              onOpenChange={async (open) => {
+              onOpenChange={(open) => {
                 setIsDrawerOpen(open);
-                if (open) {
-                  // Fetch transactions specifically for selected journals
-                  setIsFetchingTxs(true);
-                  try {
-                    const journalIds = selectedDaysData.map(j => j.journalId);
-                    const txs = await TransactionService.getTransactionsForJournals(userId, journalIds);
-                    setCycleTransactions(txs);
-                  } catch (err) {
-                    console.error("Error fetching selected transactions:", err);
-                  } finally {
-                    setIsFetchingTxs(false);
-                  }
-                } else {
+                if (!open) {
                   setIsDetailedOpen(false);
+                  setSelectedTxInfo(null);
                 }
               }}
             >
@@ -640,48 +832,69 @@ export function ArchiveView() {
                               <div className="flex justify-center items-center py-8">
                                 <span className="text-muted-foreground font-medium text-sm">Loading transactions...</span>
                               </div>
+                            ) : selectedTransactions.length === 0 ? (
+                              <div className="flex justify-center items-center py-8">
+                                <span className="text-muted-foreground font-medium text-sm">No transactions recorded for the selected dates.</span>
+                              </div>
                             ) : (
                               <div className="flex flex-col gap-6">
                                 {drawerCategories.map((cat) => {
                                   const catTxs = selectedTransactions.filter(t => t.categoryId === cat.categoryId && t.transactionType === 'EXPENSE');
                                   if (catTxs.length === 0) return null;
 
-                                return (
-                                  <div key={cat.categoryId} className="flex flex-col">
-                                    <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
-                                      <div className="flex items-center gap-2">
-                                        <cat.icon size={16} style={{ color: cat.color }} />
-                                        <span className="font-bold text-sm text-foreground">{cat.name}</span>
-                                      </div>
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-xs text-muted-foreground">{catTxs.length} txs</span>
-                                        <span className="font-bold text-sm" style={{ color: cat.color }}>{formatAmount(cat.amount)}</span>
-                                      </div>
-                                    </div>
-                                    <div className="flex flex-col gap-3 pl-2 border-l-2" style={{ borderColor: `${cat.color}30` }}>
-                                      {catTxs.map(tx => (
-                                        <div key={tx.transactionId} className="flex justify-between items-start pl-2 gap-2">
-                                          <div className="flex flex-col min-w-0 flex-1">
-                                            <span className="text-sm font-semibold text-foreground leading-tight truncate">{tx.title}</span>
-                                            <span className="text-[11px] text-muted-foreground mt-0.5">
-                                              {tx.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                              {tx.transactionDetails && tx.transactionDetails.quantity && (
-                                                <span className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[9px] uppercase tracking-wider">
-                                                  Qty: {tx.transactionDetails.quantity}
-                                                </span>
-                                              )}
-                                            </span>
-                                          </div>
-                                          <span className="font-bold text-sm text-accent-warm whitespace-nowrap flex-shrink-0">
-                                            {formatAmount(tx.amount)}
-                                          </span>
+                                  return (
+                                    <div key={cat.categoryId} className="flex flex-col">
+                                      <div className="flex items-center justify-between mb-3 border-b border-border pb-2">
+                                        <div className="flex items-center gap-2">
+                                          <cat.icon size={16} style={{ color: cat.color }} />
+                                          <span className="font-bold text-sm text-foreground">{cat.name}</span>
                                         </div>
-                                      ))}
+                                        <div className="flex items-center gap-3">
+                                          <span className="text-xs text-muted-foreground">{catTxs.length} txs</span>
+                                          <span className="font-bold text-sm" style={{ color: cat.color }}>{formatAmount(cat.amount)}</span>
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-col gap-2 pl-2 border-l-2" style={{ borderColor: `${cat.color}30` }}>
+                                        {catTxs.map(tx => (
+                                          <button
+                                            key={tx.transactionId}
+                                            onClick={() => setSelectedTxInfo({
+                                              tx,
+                                              category: globalCategories.find(c => c.categoryId === tx.categoryId),
+                                              cycleName: cycle.cycleName
+                                            })}
+                                            className="flex justify-between items-start pl-2 pr-2 py-1.5 rounded-xl gap-2 w-full text-left hover:bg-muted/40 transition-colors group active:scale-[0.99]"
+                                          >
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="text-sm font-semibold text-foreground leading-tight truncate group-hover:text-primary transition-colors">
+                                                  {tx.title}
+                                                </span>
+                                                {(tx.receiptUrl || tx.transactionDetails?.receipt?.attached) && (
+                                                  <span title="Receipt attached" className="shrink-0 text-muted-foreground/70">
+                                                    <Receipt size={12} />
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span className="text-[11px] text-muted-foreground mt-0.5">
+                                                {(tx.date instanceof Date ? tx.date : new Date(tx.date)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                {tx.transactionDetails && tx.transactionDetails.quantity && (
+                                                  <span className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[9px] uppercase tracking-wider">
+                                                    Qty: {tx.transactionDetails.quantity}
+                                                  </span>
+                                                )}
+                                              </span>
+                                            </div>
+                                            <span className="font-bold text-sm text-accent-warm whitespace-nowrap flex-shrink-0">
+                                              {formatAmount(tx.amount)}
+                                            </span>
+                                          </button>
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                                  );
+                                })}
+                              </div>
                             )}
                           </motion.div>
                         )}
@@ -694,6 +907,14 @@ export function ArchiveView() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Transaction Detail Drawer */}
+      <TransactionDetailDrawer
+        isOpen={selectedTxInfo !== null}
+        onClose={() => setSelectedTxInfo(null)}
+        txInfo={selectedTxInfo}
+        activeScope={currentScope}
+      />
     </div>
   );
 }

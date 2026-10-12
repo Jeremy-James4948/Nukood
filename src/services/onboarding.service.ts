@@ -300,7 +300,7 @@ export class OnboardingService {
     //   c) settings doc missing, or isOnboarded === false → false (new user)
     // -----------------------------------------------------------------------
     const settingsRef = doc(db, 'users', userId, 'settings', 'financial');
-    const alreadyOnboarded = await FinancialSettingsService.getUserInitializationState(userId);
+    const alreadyOnboarded = await FinancialSettingsService.getUserInitializationState({ type: 'PERSONAL', id: userId });
 
 
     if (alreadyOnboarded) {

@@ -1,7 +1,8 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getStorage } from 'firebase/storage';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
 // Resolve environment variables safely in both Vite (browser) and Node (test scripts).
 // In Vite, import.meta.env is always defined. In Node/tsx, it may be undefined, so
@@ -33,5 +34,21 @@ export const auth = getAuth(app);
 
 // Initialize Cloud Storage and get a reference to the service
 export const storage = getStorage(app);
+
+// Initialize Cloud Functions and get a reference to the service
+export const functions = getFunctions(app, 'us-central1');
+
+// Connect to emulators if in development mode
+const isDev = (typeof import.meta !== 'undefined' && (import.meta as any).env) 
+  ? (import.meta as any).env.DEV 
+  : process.env.NODE_ENV !== 'production';
+
+if (isDev) {
+  console.log('Connecting to Firebase Emulators...');
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectStorageEmulator(storage, '127.0.0.1', 9199);
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+}
 
 

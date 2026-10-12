@@ -94,7 +94,7 @@ export const InitializationProvider: React.FC<{ children: React.ReactNode }> = (
 
     const fetchInitState = async () => {
       try {
-        const state = await FinancialSettingsService.getUserInitializationState(userId);
+        const state = await FinancialSettingsService.getUserInitializationState({ type: 'PERSONAL', id: userId });
         if (!cancelled) {
           setIsOnboarded(state);
         }

@@ -12,6 +12,8 @@ import { DailyJournal, DailyJournalService } from '../services/dailyJournal.serv
 import { useAuth } from './AuthContext';
 
 interface FinancialEngineContextType {
+  activeScope: FinancialScope;
+  setActiveScope: (scope: FinancialScope) => void;
   settings: FinancialSettings | null;
   activeCycle: FinancialCycle | null;
   categories: Category[];
@@ -46,6 +48,17 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
   const { user, isAuthenticated } = useAuth();
   const userId = user?.userId || '';
 
+  const [activeScope, setActiveScope] = useState<FinancialScope>(() => {
+    try {
+      const stored = localStorage.getItem('nukood_active_scope');
+      if (stored) {
+        return JSON.parse(stored) as FinancialScope;
+      }
+    } catch (e) {
+      console.warn("Failed to read activeScope from localStorage", e);
+    }
+    return { type: "PERSONAL", id: userId || "" };
+  });
   const [settings, setSettings] = useState<FinancialSettings | null>(null);
   const [activeCycle, setActiveCycle] = useState<FinancialCycle | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -55,6 +68,17 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
   const [dailyJournals, setDailyJournals] = useState<DailyJournal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('nukood_active_scope', JSON.stringify(activeScope));
+  }, [activeScope]);
+
+  useEffect(() => {
+    // If the active scope is personal, ensure it matches the current authenticated user's ID
+    if (userId && activeScope.type === 'PERSONAL' && activeScope.id !== userId) {
+      setActiveScope({ type: 'PERSONAL', id: userId });
+    }
+  }, [userId, activeScope.type, activeScope.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -77,6 +101,16 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
       setIsLoading(true);
       setError(null);
 
+      // Reset state for new scope
+      if (mounted) {
+        setSettings(null);
+        setActiveCycle(null);
+        setTransactions([]);
+        setDailyJournals([]);
+      }
+
+      // Group data loading is now supported for foundational setup
+
       try {
         // --- PHASE 3 ONBOARDING GUARD ---
         // Check whether this user has completed onboarding before loading or
@@ -88,7 +122,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
         //   true  — settings doc exists with isOnboarded=true, OR legacy user
         //           without the field (treated as already onboarded).
         //   false — no settings doc, or isOnboarded is explicitly false.
-        const isOnboarded = await FinancialSettingsService.getUserInitializationState(userId);
+        const isOnboarded = await FinancialSettingsService.getUserInitializationState(activeScope);
         if (!isOnboarded) {
           // New user who has not yet completed onboarding.
           // Leave settings and cycle null — the onboarding flow will
@@ -103,10 +137,10 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
         // --- END ONBOARDING GUARD ---
 
         // 1. Fetch or Initialize Settings
-        let currentSettings = await FinancialSettingsService.getSettings(userId);
+        let currentSettings = await FinancialSettingsService.getSettings(activeScope);
         if (!currentSettings) {
           // Setup a default budget of 1500 for the new user
-          currentSettings = await FinancialSettingsService.initializeSettings(userId, {
+          currentSettings = await FinancialSettingsService.initializeSettings(activeScope, {
             monthlyBudget: 1500,
             currency: 'INR'
           });
@@ -116,7 +150,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
         setSettings(currentSettings);
 
         // 2. Fetch or Initialize Active Cycle
-        let cycle = await FinancialCycleService.getActiveCycle(userId);
+        let cycle = await FinancialCycleService.getActiveCycle(activeScope);
 
         // Auto-close: if today is past the active cycle's end date, it's over.
         // Mark it COMPLETED so carry-forward picks it up, then create the new cycle.
@@ -127,13 +161,13 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
         while (isExpired || !cycle) {
           if (cycle) {
             console.log(`[FinancialEngine] Cycle "${cycle.cycleName}" has expired. Closing and creating new cycle.`);
-            await FinancialCycleService.completeCycle(userId, cycle.cycleId);
+            await FinancialCycleService.completeCycle(activeScope, cycle.cycleId);
             lastClosedCycle = cycle;
             cycle = null;
           }
 
           const cycleName = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-          cycle = await FinancialCycleService.createNewCycle(userId, currentSettings, cycleName, lastClosedCycle);
+          cycle = await FinancialCycleService.createNewCycle(activeScope, currentSettings, cycleName, lastClosedCycle);
           
           isExpired = cycle && new Date() > cycle.endDate;
         }
@@ -158,22 +192,22 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
         setFastEntries(userFastEntries);
 
 
-          const userTransactions = await TransactionService.getTransactionsForCycle(userId, cycle.cycleId);
-          
+        const userTransactions = await TransactionService.getTransactionsForCycle(activeScope, cycle.cycleId);
+        
+        let finalTransactions = userTransactions;
+
+        if (activeScope.type === 'PERSONAL') {
           // MIGRATION: Automatically heal older transactions without journalIds
           const missing = userTransactions.filter(tx => !tx.journalId);
           if (missing.length > 0) {
             console.log("Migrating missing journals...", missing.length);
-            await TransactionService.migrateMissingJournals(userId, cycle.cycleId, missing);
+            await TransactionService.migrateMissingJournals(activeScope, cycle.cycleId, missing);
             // Re-fetch transactions after fixing
-            const fixedTransactions = await TransactionService.getTransactionsForCycle(userId, cycle.cycleId);
-            if (!mounted) return;
-            setTransactions(fixedTransactions);
+            finalTransactions = await TransactionService.getTransactionsForCycle(activeScope, cycle.cycleId);
           }
           
           // MIGRATION: Category Summary Initialization
           const currentCycle = cycle;
-          const finalTransactions = missing.length > 0 ? (await TransactionService.getTransactionsForCycle(userId, cycle.cycleId)) : userTransactions;
 
           if (!currentCycle.categorySummary) {
             console.log("Migrating categorySummary...");
@@ -198,25 +232,25 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
                }
             });
             
-            const cycleRef = doc(db, 'users', userId, 'financialCycles', currentCycle.cycleId);
+            const cycleRef = doc(db, ...getScopePath(activeScope), 'financialCycles', currentCycle.cycleId);
             await updateDoc(cycleRef, { categorySummary });
             
             currentCycle.categorySummary = categorySummary;
             if (mounted) setActiveCycle({...currentCycle});
           }
-
-          if (missing.length === 0) {
-            if (!mounted) return;
-            setTransactions(userTransactions);
-          }
-          
-          const userJournals = await DailyJournalService.getDailyJournalsForCycle(userId, cycle.cycleId);
-          
+        }
+        
+        if (mounted) {
+          setTransactions(finalTransactions);
+        }
+        
+        const userJournals = await DailyJournalService.getDailyJournalsForCycle(activeScope, cycle.cycleId);
+        
+        let migratedJournals = userJournals;
+        if (activeScope.type === 'PERSONAL') {
           // MIGRATION: Journal Category Summary
-          let journalsModified = false;
-          const migratedJournals = await Promise.all(userJournals.map(async (journal) => {
+          migratedJournals = await Promise.all(userJournals.map(async (journal) => {
             if (!journal.categorySummary) {
-              journalsModified = true;
               const journalTx = finalTransactions.filter(t => t.journalId === journal.journalId && t.transactionType === 'EXPENSE');
               const jSummary: Record<string, any> = {};
               
@@ -232,15 +266,17 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
                 }
               });
 
-              const jRef = doc(db, 'users', userId, 'financialCycles', cycle.cycleId, 'dailyJournals', journal.journalId);
+              const jRef = doc(db, ...getScopePath(activeScope), 'financialCycles', cycle.cycleId, 'dailyJournals', journal.journalId);
               await updateDoc(jRef, { categorySummary: jSummary });
               return { ...journal, categorySummary: jSummary };
             }
             return journal;
           }));
+        }
 
-          if (!mounted) return;
+        if (mounted) {
           setDailyJournals(migratedJournals);
+        }
 
       } catch (err) {
         if (mounted) {
@@ -259,11 +295,11 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
     return () => {
       mounted = false;
     };
-  }, [userId, isAuthenticated]); // Re-runs whenever the authenticated user changes
+  }, [userId, isAuthenticated, activeScope.type, activeScope.id]); // Re-runs whenever the authenticated user changes
 
   const refreshCycle = async () => {
     try {
-      const cycle = await FinancialCycleService.getActiveCycle(userId);
+      const cycle = await FinancialCycleService.getActiveCycle(activeScope);
       if (cycle) {
         setActiveCycle(cycle);
       }
@@ -274,7 +310,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   const refreshSettings = async () => {
     try {
-      const currentSettings = await FinancialSettingsService.getSettings(userId);
+      const currentSettings = await FinancialSettingsService.getSettings(activeScope);
       if (currentSettings) {
         setSettings(currentSettings);
       }
@@ -302,7 +338,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
       : [...currentHidden, categoryId];
 
     try {
-      await FinancialSettingsService.updateSettings(userId, { hiddenCategoryIds: newHidden });
+      await FinancialSettingsService.updateSettings(activeScope, { hiddenCategoryIds: newHidden });
       setSettings({ ...settings, hiddenCategoryIds: newHidden });
     } catch (err) {
       console.error("Error toggling category visibility:", err);
@@ -312,10 +348,10 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
   const refreshTransactions = async () => {
     try {
       if (activeCycle) {
-        const userTransactions = await TransactionService.getTransactionsForCycle(userId, activeCycle.cycleId);
+        const userTransactions = await TransactionService.getTransactionsForCycle(activeScope, activeCycle.cycleId);
         setTransactions(userTransactions);
         
-        const userJournals = await DailyJournalService.getDailyJournalsForCycle(userId, activeCycle.cycleId);
+        const userJournals = await DailyJournalService.getDailyJournalsForCycle(activeScope, activeCycle.cycleId);
         setDailyJournals(userJournals);
       }
     } catch (err) {
@@ -356,7 +392,7 @@ export const FinancialEngineProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   return (
     <FinancialEngineContext.Provider value={{ 
-      settings, activeCycle, categories, templates, fastEntries, transactions, dailyJournals, isLoading, error, userId: userId, 
+      activeScope, setActiveScope, settings, activeCycle, categories, templates, fastEntries, transactions, dailyJournals, isLoading, error, userId: userId, 
       refreshCycle, refreshSettings, refreshCategories, refreshTransactions,
         refreshFastEntries,
         updateFastEntry,

@@ -1,8 +1,11 @@
 import React from 'react';
 import { Drawer } from 'vaul';
-import { X, User, CreditCard, LogOut, ChevronRight } from 'lucide-react';
+import { X, User, CreditCard, LogOut, ChevronRight, Users, PlusCircle } from 'lucide-react';
 import { useCurrencyFormatter } from '../../utils/currency';
 import { useFinancialEngine } from '../../context/FinancialEngineContext';
+import { Group, GroupService } from '../../services/group.service';
+import { useState, useEffect } from 'react';
+import { GroupOnboardingDrawer } from '../../features/groups/GroupOnboardingDrawer';
 
 interface ProfileDrawerProps {
   isOpen: boolean;
@@ -11,11 +14,20 @@ interface ProfileDrawerProps {
 
 export function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
   const { formatAmount } = useCurrencyFormatter();
-  const { settings } = useFinancialEngine();
-  
+  const { settings, activeScope, setActiveScope, userId } = useFinancialEngine();
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [isGroupOnboardingOpen, setIsGroupOnboardingOpen] = useState(false);
+
+  useEffect(() => {
+    if (userId && isOpen) {
+      GroupService.getUserGroups(userId).then(setGroups).catch(console.error);
+    }
+  }, [userId, isOpen]);
+
   const profileName = settings?.profileName || 'Alex Chen';
   const profilePicture = settings?.profilePicture || 'A';
   return (
+    <>
     <Drawer.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
@@ -56,6 +68,95 @@ export function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
               </div>
             </div>
 
+            <div className="bg-card rounded-2xl p-5 mb-6 shadow-sm border border-border">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Financial Spaces</h3>
+              
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    setActiveScope({ type: 'PERSONAL', id: userId });
+                    onClose();
+                  }}
+                  className={`flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
+                    activeScope.type === 'PERSONAL' 
+                      ? 'bg-accent/10 border border-accent/20' 
+                      : 'hover:bg-muted border border-transparent'
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                    activeScope.type === 'PERSONAL' ? 'bg-accent/20 text-accent' : 'bg-primary/5 text-foreground'
+                  }`}>
+                    <User size={20} strokeWidth={2} />
+                  </div>
+                  <div className="flex-1">
+                    <span className={`font-semibold block ${activeScope.type === 'PERSONAL' ? 'text-accent' : 'text-foreground'}`}>
+                      Personal
+                    </span>
+                    <span className="text-xs text-muted-foreground block">Individual tracking</span>
+                  </div>
+                  {activeScope.type === 'PERSONAL' && (
+                    <div className="w-2 h-2 rounded-full bg-accent ml-auto"></div>
+                  )}
+                </button>
+
+                {groups.length === 0 ? (
+                  <div className="py-3 px-2 text-center">
+                    <p className="text-sm text-muted-foreground">You aren't in any groups yet.</p>
+                  </div>
+                ) : (
+                  groups.map(group => {
+                    const isActive = activeScope.type === 'GROUP' && activeScope.id === group.groupId;
+                    return (
+                      <button
+                        key={group.groupId}
+                        onClick={() => {
+                          setActiveScope({ type: 'GROUP', id: group.groupId });
+                          onClose();
+                        }}
+                        className={`flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${
+                          isActive 
+                            ? 'bg-accent/10 border border-accent/20' 
+                            : 'hover:bg-muted border border-transparent'
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                          isActive ? 'bg-accent/20 text-accent' : 'bg-primary/5 text-foreground'
+                        }`}>
+                          <Users size={20} strokeWidth={2} />
+                        </div>
+                        <div className="flex-1 truncate">
+                          <span className={`font-semibold block truncate ${isActive ? 'text-accent' : 'text-foreground'}`}>
+                            {group.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground block truncate">Group sharing</span>
+                        </div>
+                        {isActive && (
+                          <div className="w-2 h-2 rounded-full bg-accent ml-auto shrink-0"></div>
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+
+                <div className="h-px bg-border my-2 mx-1" />
+
+                <button 
+                  onClick={() => {
+                    onClose();
+                    setTimeout(() => setIsGroupOnboardingOpen(true), 150); // wait for drawer to close before opening the new one
+                  }}
+                  className="flex items-center gap-3 p-3 rounded-xl transition-colors text-left hover:bg-muted border border-transparent group"
+                >
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-primary/5 text-foreground group-hover:bg-accent/10 group-hover:text-accent transition-colors">
+                    <PlusCircle size={20} strokeWidth={2} />
+                  </div>
+                  <span className="font-semibold text-foreground group-hover:text-accent transition-colors">
+                    Create Group
+                  </span>
+                </button>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-3">
               {[
                 { icon: User, label: 'Account Information' },
@@ -75,5 +176,10 @@ export function ProfileDrawer({ isOpen, onClose }: ProfileDrawerProps) {
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+    <GroupOnboardingDrawer 
+      isOpen={isGroupOnboardingOpen} 
+      onClose={() => setIsGroupOnboardingOpen(false)} 
+    />
+    </>
   );
 }

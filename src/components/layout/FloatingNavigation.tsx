@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { RotateCcw, Home, Archive as ArchiveIcon, Users } from 'lucide-react';
 import { useThemeMotion } from '../../hooks/useThemeMotion';
 
+import { useFinancialEngine } from '../../context/FinancialEngineContext';
+
 interface FloatingNavigationProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -10,19 +12,26 @@ interface FloatingNavigationProps {
 
 export function FloatingNavigation({ activeTab, setActiveTab }: FloatingNavigationProps) {
   const { variants } = useThemeMotion();
+  const { activeScope } = useFinancialEngine();
+  
   const tabs = [
     { id: 'History', icon: RotateCcw },
     { id: 'Journal', icon: Home },
-    { id: 'Splits', icon: Users },
+    ...(activeScope.type === 'PERSONAL' ? [
+      { id: 'Splits', icon: Users }
+    ] : []),
     { id: 'Archive', icon: ArchiveIcon }
   ];
 
   return (
-    <motion.div
-      {...variants.slideUp}
-      className="absolute top-8 left-1/2 -translate-x-1/2 z-50 flex justify-center"
-    >
-      <div className="flex items-center p-1.5 h-[56px] bg-card/80 backdrop-blur-2xl shadow-[0_12px_40px_-10px_rgba(0,0,0,0.4)] border border-white/20 rounded-full">
+    <div className="absolute top-8 left-0 right-0 z-50 flex justify-center items-center gap-4 px-6 pointer-events-none">
+
+      
+      <motion.div
+        {...variants.slideUp}
+        className="pointer-events-auto"
+      >
+        <div className="flex items-center p-1.5 h-[56px] bg-card/80 backdrop-blur-2xl shadow-[0_12px_40px_-10px_rgba(0,0,0,0.4)] border border-white/20 rounded-full">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -61,5 +70,6 @@ export function FloatingNavigation({ activeTab, setActiveTab }: FloatingNavigati
         })}
       </div>
     </motion.div>
+    </div>
   );
 }
